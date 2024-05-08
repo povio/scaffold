@@ -1,5 +1,6 @@
 import { debug as _debug } from 'debug';
 import type { Project } from 'ts-morph';
+import { z } from 'zod';
 
 import {
   type ScaffoldingExecutor,
@@ -22,10 +23,13 @@ const debug = _debug('scaffold:module');
  *  of the actions and executors that were run.
  *
  */
-export class ScaffoldingModule implements ScaffoldingModuleAbstract {
+export class ScaffoldingModule<Schema extends z.ZodObject<any, any, any> = z.ZodObject<any, any, any>>
+  implements ScaffoldingModuleAbstract<Schema>
+{
   public version: string = '1.0.0';
   public priority: number = 50;
   public enabled = true;
+  public configSchema?: Schema;
 
   constructor(
     public name?: string,
@@ -43,8 +47,8 @@ export class ScaffoldingModule implements ScaffoldingModuleAbstract {
   public async exec(
     context: {
       cwd: string;
-      modules: Record<string, ScaffoldingModuleAbstract>;
-      config: Record<string, any>;
+      modules: Record<string, ScaffoldingModuleAbstract<any>>;
+      config: z.infer<Schema>;
       store: Record<string, any>;
       arguments: Record<string, any>;
     },

@@ -1,22 +1,30 @@
 import { unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, afterEach } from 'node:test';
+import { z } from 'zod';
 
 import { ScaffoldingHandler } from '../core/scaffolding-handler';
 import { ScaffoldingModule } from '../core/scaffolding-module';
 
 const filePath = join(__dirname, `ts-morph.test.${Math.random()}.ts`);
 
+const configSchema = z.object({
+  thing: z.string(),
+});
+
 export class TsMorphTestModule extends ScaffoldingModule {
   name = 'ts-morph-test';
 
-  async init() {
+  configSchema = configSchema;
+
+  init({ config }: { config: z.infer<typeof configSchema> }) {
     this.executors = [
       {
         match: { state: 'stuff-done' },
-        init: async ({ request: { values } }, { tsMorphProject }) => {
-          tsMorphProject.createSourceFile(filePath, `console.log("${values.thing}");`);
-          return {};
+        init: async ({ request: { values } }, { tsMorphProject, logger }, response) => {
+          logger('info', `from config ${config.thing}`);
+          tsMorphProject.createSourceFile(filePath, `console.log("${values.thing} ${config.thing}");`);
+          return response;
         },
       },
     ];

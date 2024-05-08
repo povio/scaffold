@@ -1,10 +1,9 @@
 import type { Project } from 'ts-morph';
+import { z } from 'zod';
 
 export type ScaffoldingModuleLogger = (level: 'info' | 'warn' | 'error', message: string, context?: string) => void;
 
-export interface ScaffoldingModuleAbstract {
-  // todo, zod config definition
-
+export interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, any>> {
   /**
    * Unique name
    */
@@ -33,6 +32,12 @@ export interface ScaffoldingModuleAbstract {
   executors: ScaffoldingExecutor[];
 
   /**
+   * Zod config schema
+   *  validated before init, if provided
+   */
+  configSchema?: z.infer<ConfigSchema>;
+
+  /**
    * Initialize the module
    *  - introduce requests and executors, based on options and contexts
    *  - this is run once all modules are registered
@@ -46,9 +51,9 @@ export interface ScaffoldingModuleAbstract {
       /**
        * all other loaded modules
        */
-      modules: Record<string, ScaffoldingModuleAbstract>;
+      modules: Record<string, ScaffoldingModuleAbstract<any>>;
       // todo checked-in config, zod validated
-      config: Record<string, any>;
+      config?: Record<string, any>;
       // todo checked-in store, not validated
       store: Record<string, any>;
       // todo passed in arguments, zod validated
@@ -64,7 +69,7 @@ export interface ScaffoldingModuleAbstract {
   exec(
     context: {
       cwd: string;
-      modules: Record<string, ScaffoldingModuleAbstract>;
+      modules: Record<string, ScaffoldingModuleAbstract<any>>;
       config: Record<string, any>;
       store: Record<string, any>;
       arguments: Record<string, any>;
@@ -157,7 +162,7 @@ export interface ScaffoldingRequest {
   /**
    * requesting module
    */
-  module?: ScaffoldingModuleAbstract;
+  module?: ScaffoldingModuleAbstract<any>;
 
   /**
    * Human-readable description

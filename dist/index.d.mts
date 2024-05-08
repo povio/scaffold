@@ -1,22 +1,24 @@
 import { Project } from 'ts-morph';
 import * as tsMorph from 'ts-morph';
 export { tsMorph };
-import * as semver from 'semver';
-export { semver };
+import { z } from 'zod';
 import * as zod from 'zod';
 export { zod };
+import * as semver from 'semver';
+export { semver };
 
 type ScaffoldingModuleLogger = (level: 'info' | 'warn' | 'error', message: string, context?: string) => void;
-interface ScaffoldingModuleAbstract {
+interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, any>> {
     name?: string;
     enabled: boolean;
     priority: number;
     requests: ScaffoldingRequest[];
     executors: ScaffoldingExecutor[];
+    configSchema?: z.infer<ConfigSchema>;
     init?(context: {
         cwd: string;
-        modules: Record<string, ScaffoldingModuleAbstract>;
-        config: Record<string, any>;
+        modules: Record<string, ScaffoldingModuleAbstract<any>>;
+        config?: Record<string, any>;
         store: Record<string, any>;
         arguments: Record<string, any>;
     }, plugins: {
@@ -25,7 +27,7 @@ interface ScaffoldingModuleAbstract {
     }): Promise<void>;
     exec(context: {
         cwd: string;
-        modules: Record<string, ScaffoldingModuleAbstract>;
+        modules: Record<string, ScaffoldingModuleAbstract<any>>;
         config: Record<string, any>;
         store: Record<string, any>;
         arguments: Record<string, any>;
@@ -62,7 +64,7 @@ interface ScaffoldingExecutor {
     }) => Promise<void>;
 }
 interface ScaffoldingRequest {
-    module?: ScaffoldingModuleAbstract;
+    module?: ScaffoldingModuleAbstract<any>;
     description?: string;
     match: Record<string, any> & {
         module?: string;
@@ -77,18 +79,19 @@ interface ScaffoldingRequest {
     }[];
 }
 
-declare class ScaffoldingModule implements ScaffoldingModuleAbstract {
+declare class ScaffoldingModule<Schema extends z.ZodObject<any, any, any> = z.ZodObject<any, any, any>> implements ScaffoldingModuleAbstract<Schema> {
     name?: string | undefined;
     requests: ScaffoldingRequest[];
     executors: ScaffoldingExecutor[];
     version: string;
     priority: number;
     enabled: boolean;
+    configSchema?: Schema;
     constructor(name?: string | undefined, requests?: ScaffoldingRequest[], executors?: ScaffoldingExecutor[]);
     exec(context: {
         cwd: string;
-        modules: Record<string, ScaffoldingModuleAbstract>;
-        config: Record<string, any>;
+        modules: Record<string, ScaffoldingModuleAbstract<any>>;
+        config: z.infer<Schema>;
         store: Record<string, any>;
         arguments: Record<string, any>;
     }, plugins: {
@@ -97,14 +100,15 @@ declare class ScaffoldingModule implements ScaffoldingModuleAbstract {
     }): Promise<{}>;
 }
 
-declare class ScaffoldingHandler<SM extends ScaffoldingModuleAbstract> {
+declare class ScaffoldingHandler {
     readonly cwd: string;
     readonly tsMorphProject: Project;
-    readonly modulesDict: Record<string, SM>;
+    readonly modulesDict: Record<string, ScaffoldingModuleAbstract<any>>;
     readonly executors: ScaffoldingExecutor[];
+    readonly config: Record<string, any>;
     logger(level: 'info' | 'warn' | 'error', message: string, context?: string): void;
     constructor(cwd?: string);
-    register(module: SM): void;
+    register(module: ScaffoldingModuleAbstract<any>): void;
     init(): Promise<void>;
     exec(): Promise<void>;
     reset(): void;

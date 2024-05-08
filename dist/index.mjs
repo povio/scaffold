@@ -5,7 +5,7 @@ import {
   semver,
   tsMorph,
   zod
-} from "./chunk-BBH53TUU.mjs";
+} from "./chunk-I54NF36I.mjs";
 export {
   ScaffoldingHandler,
   ScaffoldingModule,

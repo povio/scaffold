@@ -1,14 +1,16 @@
 import { debug as _debug } from 'debug';
 import { Project } from 'ts-morph';
 
+import { loadConfig } from './scaffolding-config';
 import type { ScaffoldingExecutor, ScaffoldingModuleAbstract } from './scaffolding.interfaces';
 
 const debug = _debug('scaffold:handler');
 
-export class ScaffoldingHandler<SM extends ScaffoldingModuleAbstract> {
+export class ScaffoldingHandler {
   public readonly tsMorphProject;
-  public readonly modulesDict: Record<string, SM> = {};
+  public readonly modulesDict: Record<string, ScaffoldingModuleAbstract<any>> = {};
   public readonly executors: ScaffoldingExecutor[] = [];
+  public readonly config: Record<string, any> = {};
 
   public logger(level: 'info' | 'warn' | 'error', message: string, context?: string) {
     // eslint-disable-next-line no-console
@@ -20,9 +22,10 @@ export class ScaffoldingHandler<SM extends ScaffoldingModuleAbstract> {
     public readonly cwd: string = process.cwd(),
   ) {
     this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
+    this.config = loadConfig(this.cwd);
   }
 
-  register(module: SM) {
+  register(module: ScaffoldingModuleAbstract<any>) {
     if (!module.name) {
       throw new Error('name is required');
     }
@@ -42,6 +45,17 @@ export class ScaffoldingHandler<SM extends ScaffoldingModuleAbstract> {
 
     // init all modules
     for (const module of modules) {
+      // load config for the module
+      let config = module.name && module.name in this.config ? this.config[module.name] : undefined;
+      if (module.configSchema) {
+        // validate the config if schema is provided
+        const { success, data, error } = await module.configSchema.safeParseAsync(config || {});
+        if (!success) {
+          throw new Error(`Invalid config for ${module.name}: ${error}`);
+        }
+        config = data;
+      }
+
       /**
        * ScaffoldingModuleAbstract.init
        */
@@ -51,7 +65,7 @@ export class ScaffoldingHandler<SM extends ScaffoldingModuleAbstract> {
             cwd: this.cwd,
             // todo, pass in config
             modules: this.modulesDict,
-            config: {},
+            config,
             // todo, pass in persisted store
             store: {},
             // todo, pass in run arguments

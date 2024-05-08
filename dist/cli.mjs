@@ -2,7 +2,7 @@
 import {
   ScaffoldingHandler,
   findScaffoldFiles
-} from "./chunk-BBH53TUU.mjs";
+} from "./chunk-I54NF36I.mjs";
 
 // src/cli.ts
 import yargs from "yargs";
@@ -15,10 +15,17 @@ var version = "1.0.0";
 var command = {
   command: "apply",
   describe: "apply scaffolding",
-  builder: {},
-  handler: async () => {
+  builder: {
+    cwd: {
+      describe: "Root directory of the project",
+      demandOption: true,
+      type: "string",
+      default: process.cwd()
+    }
+  },
+  handler: async (args) => {
     try {
-      const cwd = process.cwd();
+      const cwd = args.cwd;
       const sh = new ScaffoldingHandler(cwd);
       for await (const module of findScaffoldFiles({
         cwd

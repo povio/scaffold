@@ -2,7 +2,7 @@
 "use strict"; function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
 
-var _chunkH7KHBFKSjs = require('./chunk-H7KHBFKS.js');
+var _chunkIVVP2ICQjs = require('./chunk-IVVP2ICQ.js');
 
 // src/cli.ts
 var _yargs = require('yargs'); var _yargs2 = _interopRequireDefault(_yargs);
@@ -15,12 +15,19 @@ var version = "1.0.0";
 var command = {
   command: "apply",
   describe: "apply scaffolding",
-  builder: {},
-  handler: async () => {
+  builder: {
+    cwd: {
+      describe: "Root directory of the project",
+      demandOption: true,
+      type: "string",
+      default: process.cwd()
+    }
+  },
+  handler: async (args) => {
     try {
-      const cwd = process.cwd();
-      const sh = new (0, _chunkH7KHBFKSjs.ScaffoldingHandler)(cwd);
-      for await (const module of _chunkH7KHBFKSjs.findScaffoldFiles.call(void 0, {
+      const cwd = args.cwd;
+      const sh = new (0, _chunkIVVP2ICQjs.ScaffoldingHandler)(cwd);
+      for await (const module of _chunkIVVP2ICQjs.findScaffoldFiles.call(void 0, {
         cwd
       })) {
         sh.register(module);

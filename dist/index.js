@@ -5,7 +5,7 @@
 
 
 
-var _chunkH7KHBFKSjs = require('./chunk-H7KHBFKS.js');
+var _chunkIVVP2ICQjs = require('./chunk-IVVP2ICQ.js');
 
 
 
@@ -13,5 +13,5 @@ var _chunkH7KHBFKSjs = require('./chunk-H7KHBFKS.js');
 
 
 
-exports.ScaffoldingHandler = _chunkH7KHBFKSjs.ScaffoldingHandler; exports.ScaffoldingModule = _chunkH7KHBFKSjs.ScaffoldingModule; exports.findScaffoldFiles = _chunkH7KHBFKSjs.findScaffoldFiles; exports.semver = _chunkH7KHBFKSjs.semver; exports.tsMorph = _chunkH7KHBFKSjs.tsMorph; exports.zod = _chunkH7KHBFKSjs.zod;
+exports.ScaffoldingHandler = _chunkIVVP2ICQjs.ScaffoldingHandler; exports.ScaffoldingModule = _chunkIVVP2ICQjs.ScaffoldingModule; exports.findScaffoldFiles = _chunkIVVP2ICQjs.findScaffoldFiles; exports.semver = _chunkIVVP2ICQjs.semver; exports.tsMorph = _chunkIVVP2ICQjs.tsMorph; exports.zod = _chunkIVVP2ICQjs.zod;
 //# sourceMappingURL=index.js.map
