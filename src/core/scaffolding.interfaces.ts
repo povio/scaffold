@@ -35,7 +35,7 @@ export interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any,
    * Zod config schema
    *  validated before init, if provided
    */
-  configSchema?: z.infer<ConfigSchema>;
+  configSchema?: ConfigSchema;
 
   /**
    * Initialize the module
@@ -53,7 +53,7 @@ export interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any,
        */
       modules: Record<string, ScaffoldingModuleAbstract<any>>;
       // todo checked-in config, zod validated
-      config?: Record<string, any>;
+      config?: z.infer<ConfigSchema>;
       // todo checked-in store, not validated
       store: Record<string, any>;
       // todo passed in arguments, zod validated
@@ -70,7 +70,7 @@ export interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any,
     context: {
       cwd: string;
       modules: Record<string, ScaffoldingModuleAbstract<any>>;
-      config: Record<string, any>;
+      config?: z.infer<ConfigSchema>;
       store: Record<string, any>;
       arguments: Record<string, any>;
     },

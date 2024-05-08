@@ -10,6 +10,7 @@ export class ScaffoldingHandler {
   public readonly tsMorphProject;
   public readonly modulesDict: Record<string, ScaffoldingModuleAbstract<any>> = {};
   public readonly executors: ScaffoldingExecutor[] = [];
+  public readonly rawConfig: Record<string, any> = {};
   public readonly config: Record<string, any> = {};
 
   public logger(level: 'info' | 'warn' | 'error', message: string, context?: string) {
@@ -22,7 +23,7 @@ export class ScaffoldingHandler {
     public readonly cwd: string = process.cwd(),
   ) {
     this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
-    this.config = loadConfig(this.cwd);
+    this.rawConfig = loadConfig(this.cwd);
   }
 
   register(module: ScaffoldingModuleAbstract<any>) {
@@ -46,7 +47,7 @@ export class ScaffoldingHandler {
     // init all modules
     for (const module of modules) {
       // load config for the module
-      let config = module.name && module.name in this.config ? this.config[module.name] : undefined;
+      let config = module.name! in this.rawConfig ? this.rawConfig[module.name!] : undefined;
       if (module.configSchema) {
         // validate the config if schema is provided
         const { success, data, error } = await module.configSchema.safeParseAsync(config || {});
@@ -55,6 +56,7 @@ export class ScaffoldingHandler {
         }
         config = data;
       }
+      this.config[module.name!] = config;
 
       /**
        * ScaffoldingModuleAbstract.init
@@ -63,7 +65,6 @@ export class ScaffoldingHandler {
         await module.init(
           {
             cwd: this.cwd,
-            // todo, pass in config
             modules: this.modulesDict,
             config,
             // todo, pass in persisted store
@@ -181,7 +182,7 @@ export class ScaffoldingHandler {
         {
           cwd: this.cwd,
           modules: this.modulesDict,
-          config: {}, // todo, pass in config
+          config: this.config[module.name!],
           store: {}, // todo pass in persisted store
           arguments: {}, // todo, pass in run arguments
         },

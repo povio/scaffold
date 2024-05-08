@@ -14,11 +14,11 @@ interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, a
     priority: number;
     requests: ScaffoldingRequest[];
     executors: ScaffoldingExecutor[];
-    configSchema?: z.infer<ConfigSchema>;
+    configSchema?: ConfigSchema;
     init?(context: {
         cwd: string;
         modules: Record<string, ScaffoldingModuleAbstract<any>>;
-        config?: Record<string, any>;
+        config?: z.infer<ConfigSchema>;
         store: Record<string, any>;
         arguments: Record<string, any>;
     }, plugins: {
@@ -28,7 +28,7 @@ interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, a
     exec(context: {
         cwd: string;
         modules: Record<string, ScaffoldingModuleAbstract<any>>;
-        config: Record<string, any>;
+        config?: z.infer<ConfigSchema>;
         store: Record<string, any>;
         arguments: Record<string, any>;
     }, plugins: {
@@ -105,6 +105,7 @@ declare class ScaffoldingHandler {
     readonly tsMorphProject: Project;
     readonly modulesDict: Record<string, ScaffoldingModuleAbstract<any>>;
     readonly executors: ScaffoldingExecutor[];
+    readonly rawConfig: Record<string, any>;
     readonly config: Record<string, any>;
     logger(level: 'info' | 'warn' | 'error', message: string, context?: string): void;
     constructor(cwd?: string);

@@ -17,13 +17,13 @@ export class TsMorphTestModule extends ScaffoldingModule {
 
   configSchema = configSchema;
 
-  init({ config }: { config: z.infer<typeof configSchema> }) {
+  async init({ config }: { config?: z.infer<typeof configSchema> }) {
     this.executors = [
       {
         match: { state: 'stuff-done' },
         init: async ({ request: { values } }, { tsMorphProject, logger }, response) => {
-          logger('info', `from config ${config.thing}`);
-          tsMorphProject.createSourceFile(filePath, `console.log("${values.thing} ${config.thing}");`);
+          logger('info', `from config ${config?.thing}`);
+          tsMorphProject.createSourceFile(filePath, `console.log("${values.thing} ${config?.thing}");`);
           return response;
         },
       },
