@@ -6,6 +6,9 @@ import * as zod from 'zod';
 export { zod };
 import * as semver from 'semver';
 export { semver };
+export { glob } from 'fast-glob';
+import * as yawnYaml from 'yawn-yaml';
+export { yawnYaml as YAWN };
 
 type ScaffoldingModuleLogger = (level: 'info' | 'warn' | 'error', message: string, context?: string) => void;
 interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, any>> {

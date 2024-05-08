@@ -1,6 +1,6 @@
 {
   "name": "@povio/scaffold",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Marko Zabreznik <marko.zabreznik@povio.com> (https://zabreznik.net)",
   "scripts": {
     "build": "tsup",
@@ -43,6 +43,7 @@
     "tsup": "^8.0.2",
     "typescript": "^5.4.5",
     "yargs": "^17.7.2",
+    "yawn-yaml": "^2.2.0",
     "zod": "^3.23.7"
   },
   "devDependencies": {

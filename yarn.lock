@@ -410,6 +410,7 @@ __metadata:
     tsup: "npm:^8.0.2"
     typescript: "npm:^5.4.5"
     yargs: "npm:^17.7.2"
+    yawn-yaml: "npm:^2.2.0"
     zod: "npm:^3.23.7"
   bin:
     scaffold: ./dist/cli.js
@@ -2267,6 +2268,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"lodash@npm:^4.17.21":
+  version: 4.17.21
+  resolution: "lodash@npm:4.17.21"
+  checksum: 10c0/d8cbea072bb08655bb4c989da418994b073a608dffa608b09ac04b43a791b12aeae7cd7ad919aa4c925f33b48490b5cfe6c1f71d827956071dae2e7bb3a6b74c
+  languageName: node
+  linkType: hard
+
 "lru-cache@npm:^10.0.1, lru-cache@npm:^10.2.0":
   version: 10.2.2
   resolution: "lru-cache@npm:10.2.2"
@@ -3482,6 +3490,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"yaml-js@npm:^0.3.1":
+  version: 0.3.1
+  resolution: "yaml-js@npm:0.3.1"
+  checksum: 10c0/ff5eeeb1773ae8401734a6bc02a92814d069c7847193d4d948a7936d64105502dbb1a9ea51c9615e226c9777b0c6ea36ff0fde52c2ced9ec6958891a894a3078
+  languageName: node
+  linkType: hard
+
 "yaml@npm:^2.3.4":
   version: 2.4.2
   resolution: "yaml@npm:2.4.2"
@@ -3510,6 +3525,17 @@ __metadata:
     y18n: "npm:^5.0.5"
     yargs-parser: "npm:^21.1.1"
   checksum: 10c0/ccd7e723e61ad5965fffbb791366db689572b80cca80e0f96aad968dfff4156cd7cd1ad18607afe1046d8241e6fb2d6c08bf7fa7bfb5eaec818735d8feac8f05
+  languageName: node
+  linkType: hard
+
+"yawn-yaml@npm:^2.2.0":
+  version: 2.2.0
+  resolution: "yawn-yaml@npm:2.2.0"
+  dependencies:
+    js-yaml: "npm:^4.1.0"
+    lodash: "npm:^4.17.21"
+    yaml-js: "npm:^0.3.1"
+  checksum: 10c0/468f228658b9302b03b8efa80cb6912761c814a58e0805c7e308f7195ecda8812abc54c61b3fe3526c933a272084d37bdd143309b6453902462312744bdb4809
   languageName: node
   linkType: hard
 
