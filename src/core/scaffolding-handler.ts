@@ -44,7 +44,7 @@ export class ScaffoldingHandler {
     // list of all registered modules
     const modules = Object.values(this.modulesDict);
 
-    // init all modules
+    // load config for all modules
     for (const module of modules) {
       // load config for the module
       let config = module.name! in this.rawConfig ? this.rawConfig[module.name!] : undefined;
@@ -57,7 +57,11 @@ export class ScaffoldingHandler {
         config = data;
       }
       this.config[module.name!] = config;
+      module.config = config;
+    }
 
+    // init all modules
+    for (const module of modules) {
       /**
        * ScaffoldingModuleAbstract.init
        */
@@ -67,7 +71,7 @@ export class ScaffoldingHandler {
           {
             cwd: this.cwd,
             modules: this.modulesDict,
-            config,
+            config: this.config[module.name!] || {},
             // todo, pass in persisted store
             store: {},
             // todo, pass in run arguments

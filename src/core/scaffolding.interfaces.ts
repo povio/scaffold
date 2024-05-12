@@ -38,6 +38,11 @@ export interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any,
   configSchema?: ConfigSchema;
 
   /**
+   * Config instance
+   */
+  config?: Record<string, any>;
+
+  /**
    * Initialize the module
    *  - introduce requests and executors, based on options and contexts
    *  - this is run once all modules are registered

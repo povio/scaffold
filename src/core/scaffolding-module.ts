@@ -30,6 +30,7 @@ export class ScaffoldingModule<Schema extends z.ZodObject<any, any, any> = z.Zod
   public priority: number = 50;
   public enabled = true;
   public configSchema?: Schema;
+  public config?: z.infer<Schema>;
 
   constructor(
     public name?: string,

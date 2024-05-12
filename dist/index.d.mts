@@ -18,6 +18,7 @@ interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, a
     requests: ScaffoldingRequest[];
     executors: ScaffoldingExecutor[];
     configSchema?: ConfigSchema;
+    config?: Record<string, any>;
     init?(context: {
         cwd: string;
         modules: Record<string, ScaffoldingModuleAbstract<any>>;
@@ -91,6 +92,7 @@ declare class ScaffoldingModule<Schema extends z.ZodObject<any, any, any> = z.Zo
     priority: number;
     enabled: boolean;
     configSchema?: Schema;
+    config?: z.infer<Schema>;
     constructor(name?: string | undefined, requests?: ScaffoldingRequest[], executors?: ScaffoldingExecutor[]);
     exec(context: {
         cwd: string;
