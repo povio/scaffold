@@ -189,6 +189,12 @@ export interface ScaffoldingRequest {
    * Executor to be used for this request
    */
   executors?: {
+    /**
+     * Disable this executor instance
+     *  preventing it from running
+     */
+    disabled: boolean;
+
     context: {
       /**
        * state passed in from the executor instance init

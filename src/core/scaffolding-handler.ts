@@ -62,6 +62,7 @@ export class ScaffoldingHandler {
        * ScaffoldingModuleAbstract.init
        */
       if (module.init) {
+        debug(`init ${module.name}`);
         await module.init(
           {
             cwd: this.cwd,
@@ -102,6 +103,7 @@ export class ScaffoldingHandler {
       for (const request of module.requests.filter((x) => Object.keys(x.match).length > 0)) {
         request.module = module;
         const requestExecutors: {
+          disabled: boolean;
           context: {
             state?: Record<string, any>;
           };
@@ -135,18 +137,24 @@ export class ScaffoldingHandler {
               debug(
                 `init ${module.name}\t -> ${exe?.match.module} \t${exe?.description ? ` -> ${exe.description}` : ''}`,
               );
-              requestExecutors.push({
-                context: {
-                  state,
-                },
-                executor: exe,
-              });
+            } else {
+              debug(
+                `disabled ${module.name}\t -> ${exe?.match.module} \t${exe?.description ? ` -> ${exe.description}` : ''}`,
+              );
             }
+            requestExecutors.push({
+              disabled: !!disabled,
+              context: {
+                state,
+              },
+              executor: exe,
+            });
           } else {
             debug(
               `init* ${module.name}\t -> ${exe?.match.module} \t${exe?.description ? ` -> ${exe.description}` : ''}`,
             );
             requestExecutors.push({
+              disabled: false,
               context: {},
               executor: exe,
             });

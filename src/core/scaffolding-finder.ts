@@ -56,7 +56,7 @@ export async function* findScaffoldFiles<SM extends ScaffoldingModule>(context: 
     dot: true, // allow dot files
     ignore: ['node_modules'],
   })) {
-    debug(`found ${file}`);
+    // debug(`found ${file}`);
     try {
       yield await loadModule(`${context.cwd}/${file}`);
     } catch (error) {

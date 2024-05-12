@@ -75,6 +75,7 @@ interface ScaffoldingRequest {
     values: any;
     optional?: boolean;
     executors?: {
+        disabled: boolean;
         context: {
             state?: Record<string, any>;
         };

@@ -1,6 +1,6 @@
 {
   "name": "@povio/scaffold",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "author": "Marko Zabreznik <marko.zabreznik@povio.com> (https://zabreznik.net)",
   "scripts": {
     "build": "tsup",

@@ -59,10 +59,11 @@ export class ScaffoldingModule<Schema extends z.ZodObject<any, any, any> = z.Zod
   ) {
     for await (const request of this.requests) {
       if (!request.executors || request.executors.length < 1) {
+        debug(`no executors on ${this.name} for request ${request.description || JSON.stringify(request.match)}`);
         continue;
       }
       for (const ex of request.executors) {
-        if (!ex.executor.exec) {
+        if (!ex.executor.exec || ex.disabled) {
           continue;
         }
         debug(
