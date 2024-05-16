@@ -1,6 +1,6 @@
 {
   "name": "@povio/scaffold",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "author": "Marko Zabreznik <marko.zabreznik@povio.com> (https://zabreznik.net)",
   "scripts": {
     "build": "tsup",
@@ -17,6 +17,9 @@
   ],
   "bin": "./dist/cli.js",
   "dependencies": {
+    "@types/debug": "^4.1.12",
+    "@types/semver": "^7.5.8",
+    "@types/yargs": "^17.0.32",
     "cosmiconfig": "^9.0.0",
     "debug": "^4.3.4",
     "fast-glob": "^3.3.2",
@@ -32,11 +35,8 @@
   "devDependencies": {
     "@swc-node/register": "^1.9.1",
     "@swc/core": "^1.5.7",
-    "@types/debug": "^4.1.12",
     "@types/interpret": "^1.1.3",
     "@types/rechoir": "^0.6.4",
-    "@types/semver": "^7.5.8",
-    "@types/yargs": "^17.0.32",
     "@typescript-eslint/eslint-plugin": "^7.9.0",
     "@typescript-eslint/parser": "^7.9.0",
     "eslint": "^8.57.0",
