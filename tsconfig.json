@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "nodenext",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node16",
     "declaration": true,
     "declarationDir": "dist",
     "removeComments": true,
