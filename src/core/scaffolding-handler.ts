@@ -72,22 +72,43 @@ export class ScaffoldingHandler {
       module.config = config;
     }
 
-    const initRequest = async (request: IRequest, module: IModule<any>): Promise<IRequest> => {
+    const createRequest = (request: Partial<IRequest> & { module: IModule<any>; match: string }): IRequest => {
+      return {
+        status: 'uninitialised',
+        priority: 0,
+        optional: false,
+        tasks: [],
+        ...request,
+      };
+    };
+
+    const initRequest = async (request: IRequest): Promise<IRequest> => {
       if (!['loading-tasks'].includes(this.status)) {
         throw new Error('Cannot init request outside of task loading step');
       }
 
-      // match executors to tasks
+      if (!request.description) {
+        request.description = request.match;
+      }
+
+      // todo, make proper matcher
       const executors = this.executors.filter((x) => x.match === request.match);
+      if (executors.length < 1 && !request.optional) {
+        request.status = 'error';
+        request.message = 'No executors were matched for non-optional request';
+        return request;
+      }
 
       for (const executor of executors) {
         const task: ITask = {
           request,
           executor,
           // todo, compute priority
-          priority: request.priority + executor.priority * 0.1,
+          priority: executor.priority + request.priority * 0.1,
           status: 'uninitialised',
         };
+
+        debug(`init ${request.module.name} "${request.description}" task "${executor.match}"`);
 
         if (executor.init) {
           await executor.init(task, {
@@ -96,15 +117,17 @@ export class ScaffoldingHandler {
         }
 
         if (task.status === 'uninitialised') {
-          task.status = 'queued';
+          // enqueue task for execution
+          task.status = executor.exec ? 'queued' : 'completed';
         }
 
         // add to module tasks for tracking purposes
-        module.tasks.push(task);
+        request.module.tasks.push(task);
 
         // add to global tasks for execution
         this.tasks.push(task);
       }
+
       return request;
     };
 
@@ -122,17 +145,11 @@ export class ScaffoldingHandler {
             config: module.config,
           },
           {
-            addRequest: async (_request: Omit<Partial<IRequest>, 'status'> & { match: string }) => {
-              const request: IRequest = {
-                module,
-                priority: 0,
-                tasks: [],
-                ..._request,
-                status: 'uninitialised',
-              };
+            addRequest: async (_request) => {
+              const request = createRequest({ ..._request, module });
               module.requests.push(request);
               if (['loading-tasks'].includes(this.status)) {
-                await initRequest(request, module);
+                await initRequest(request);
               }
               return request;
             },
@@ -141,12 +158,10 @@ export class ScaffoldingHandler {
                 throw new Error('Cannot add executor outside of module init');
               }
               const executor: IExecutor = {
-                match: '*',
                 priority: 0,
                 exception: 'throw',
                 ..._executor,
               };
-              executor.match = `${module.name}:${executor.match}`;
               module.executors.push(executor);
               this.executors.push(executor);
               debug(`init ${module.name} executor ${executor.match}`);
@@ -169,9 +184,17 @@ export class ScaffoldingHandler {
      * Init all tasks
      */
     for (const module of modules) {
-      for (const request of module.requests) {
-        await initRequest(request, module);
+      await initRequest(
+        createRequest({ description: 'Before all tasks', match: `${module.name}:#before-all`, module }),
+      );
+    }
+    for (const module of modules) {
+      for (const request of module.requests.toSorted((a, b) => a.priority - b.priority)) {
+        await initRequest(request);
       }
+    }
+    for (const module of modules) {
+      await initRequest(createRequest({ description: 'After all tasks', match: `${module.name}:#after-all`, module }));
     }
   }
 
@@ -191,6 +214,9 @@ export class ScaffoldingHandler {
         throw new Error(`Queued task ${task.executor.match} does not have an exec method`);
       }
       try {
+        debug(
+          `exec ${task.request.module.name}:${task.priority} "${task.request.description}" task "${task.executor.match}"`,
+        );
         await task.executor.exec(task, {
           tsMorphProject: this.tsMorphProject,
         });

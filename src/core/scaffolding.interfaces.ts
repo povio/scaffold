@@ -25,14 +25,19 @@ export interface IRequest {
   // Value passed to the executor
   value?: Record<string, any>;
 
-  // If true, no executors found will not cause an error
+  /**
+   * If true and match is set, no executors found will not cause an error
+   */
   optional?: boolean;
 
   // Priority of execution
   priority: number;
 
   // Status of the request
-  status: 'uninitialised' | 'initialised';
+  status: 'uninitialised' | 'initialised' | 'error';
+
+  // Human-readable status message
+  message?: string;
 
   /**
    * Executors matched to the request
@@ -71,7 +76,7 @@ export interface IExecutor {
    *  - runs once per request, after all modules have been initialized
    */
   init?: (
-    task: ITaskContext,
+    task: ITask,
     plugins: {
       tsMorphProject: Project;
     },
@@ -86,7 +91,7 @@ export interface IExecutor {
    *  - plugins can be executed by the ScaffoldingHandler
    */
   exec?: (
-    task: ITaskContext,
+    task: ITask,
     plugins: {
       tsMorphProject: Project;
     },
@@ -180,7 +185,7 @@ export type IModuleInit<ConfigSchema extends z.ZodObject<any, any, any>> = (
   },
   actions: {
     addRequest: (request: Partial<IRequest> & { match: string }) => Promise<IRequest>;
-    addExecutor: (executor: Partial<IExecutor>) => Promise<IExecutor>;
+    addExecutor: (executor: Partial<IExecutor> & { match: string }) => Promise<IExecutor>;
     setStatus: (status: IModule<any>['status'], message?: string) => void;
   },
 ) => Promise<void>;
