@@ -1,9 +1,9 @@
 export { ScaffoldingModule } from './core/scaffolding-module';
 export {
-  type ScaffoldingModuleAbstract,
-  type ScaffoldingExecutor,
-  type ScaffoldingRequest,
-  type ScaffoldingModuleLogger,
+  type IModule,
+  type IExecutor,
+  type IRequest,
+  type IScaffoldingModuleLogger,
 } from './core/scaffolding.interfaces';
 
 export { ScaffoldingHandler } from './core/scaffolding-handler';

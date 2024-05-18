@@ -1,13 +1,10 @@
-import { debug as _debug } from 'debug';
 import { glob } from 'fast-glob';
 import { jsVariants } from 'interpret';
 import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prepare } from 'rechoir';
 
-import type { ScaffoldingModule } from './scaffolding-module';
-
-const debug = _debug('scaffold:finder');
+import type { IModule } from './scaffolding.interfaces';
 
 /**
  * Import or require a module
@@ -50,7 +47,7 @@ export async function loadModule(path: string): Promise<any> {
   return await tryRequireThenImport(path);
 }
 
-export async function* findScaffoldFiles<SM extends ScaffoldingModule>(context: { cwd: string }): AsyncGenerator<SM> {
+export async function* findScaffoldFiles<SM extends IModule<any>>(context: { cwd: string }): AsyncGenerator<SM> {
   for (const file of await glob(['**/.*.scaffold.*', '**/.scaffold.*'], {
     cwd: context.cwd,
     dot: true, // allow dot files

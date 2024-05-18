@@ -2,31 +2,42 @@ import { debug as _debug } from 'debug';
 import { Project } from 'ts-morph';
 
 import { loadConfig } from './scaffolding-config';
-import type { ScaffoldingExecutor, ScaffoldingModuleAbstract } from './scaffolding.interfaces';
+import type { IExecutor, IModule, IRequest, ITask } from './scaffolding.interfaces';
 
 const debug = _debug('scaffold:handler');
 
 export class ScaffoldingHandler {
-  public readonly tsMorphProject;
-  public readonly modulesDict: Record<string, ScaffoldingModuleAbstract<any>> = {};
-  public readonly executors: ScaffoldingExecutor[] = [];
+  // All modules
+  public readonly modulesDict: Record<string, IModule<any>> = {};
+
+  // Raw cosmiconfig
   public readonly rawConfig: Record<string, any> = {};
-  public readonly config: Record<string, any> = {};
 
-  public logger(level: 'info' | 'warn' | 'error', message: string, context?: string) {
-    // eslint-disable-next-line no-console
-    console.log(`[${level}] ${context ? `[${context}]` : ''} ${message}`);
-  }
+  // All executors
+  public readonly executors: IExecutor[] = [];
 
-  constructor(
-    //
-    public readonly cwd: string = process.cwd(),
-  ) {
+  // All tasks
+  public readonly tasks: ITask[] = [];
+
+  // TsMorph Project of the current codebase
+  public readonly tsMorphProject;
+
+  public status:
+    | 'uninitialized'
+    | 'configuring'
+    | 'loading-executors'
+    | 'loading-tasks'
+    | 'prepared'
+    | 'executing'
+    | 'done'
+    | 'error' = 'uninitialized';
+
+  constructor(public readonly cwd: string = process.cwd()) {
     this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
     this.rawConfig = loadConfig(this.cwd);
   }
 
-  register(module: ScaffoldingModuleAbstract<any>) {
+  register(module: IModule<any>) {
     if (!module.name) {
       throw new Error('name is required');
     }
@@ -35,18 +46,20 @@ export class ScaffoldingHandler {
     }
     // debug(`register ${module.name}`);
     this.modulesDict[module.name] = module;
+    return module;
   }
 
   /**
    * Initialize all modules
    */
   async init() {
-    // list of all registered modules
     const modules = Object.values(this.modulesDict);
 
-    // load config for all modules
+    /**
+     * Load config for all modules
+     */
+    this.status = 'configuring';
     for (const module of modules) {
-      // load config for the module
       let config = module.name! in this.rawConfig ? this.rawConfig[module.name!] : undefined;
       if (module.configSchema) {
         // validate the config if schema is provided
@@ -56,167 +69,143 @@ export class ScaffoldingHandler {
         }
         config = data;
       }
-      this.config[module.name!] = config;
       module.config = config;
     }
 
-    // init all modules
+    const initRequest = async (request: IRequest, module: IModule<any>): Promise<IRequest> => {
+      if (!['loading-tasks'].includes(this.status)) {
+        throw new Error('Cannot init request outside of task loading step');
+      }
+
+      // match executors to tasks
+      const executors = this.executors.filter((x) => x.match === request.match);
+
+      for (const executor of executors) {
+        const task: ITask = {
+          request,
+          executor,
+          // todo, compute priority
+          priority: request.priority + executor.priority * 0.1,
+          status: 'uninitialised',
+        };
+
+        if (executor.init) {
+          await executor.init(task, {
+            tsMorphProject: this.tsMorphProject,
+          });
+        }
+
+        if (task.status === 'uninitialised') {
+          task.status = 'queued';
+        }
+
+        // add to module tasks for tracking purposes
+        module.tasks.push(task);
+
+        // add to global tasks for execution
+        this.tasks.push(task);
+      }
+      return request;
+    };
+
+    /**
+     * Find all executors
+     */
+    this.status = 'loading-executors';
     for (const module of modules) {
-      /**
-       * ScaffoldingModuleAbstract.init
-       */
       if (module.init) {
         debug(`init ${module.name}`);
         await module.init(
           {
             cwd: this.cwd,
             modules: this.modulesDict,
-            config: this.config[module.name!] || {},
-            // todo, pass in persisted store
-            store: {},
-            // todo, pass in run arguments
-            arguments: {},
+            config: module.config,
           },
           {
-            tsMorphProject: this.tsMorphProject,
-            // todo, expand logger for more contextual messages
-            logger: this.logger,
+            addRequest: async (_request: Omit<Partial<IRequest>, 'status'> & { match: string }) => {
+              const request: IRequest = {
+                module,
+                priority: 0,
+                tasks: [],
+                ..._request,
+                status: 'uninitialised',
+              };
+              module.requests.push(request);
+              if (['loading-tasks'].includes(this.status)) {
+                await initRequest(request, module);
+              }
+              return request;
+            },
+            addExecutor: async (_executor) => {
+              if (!['loading-executors'].includes(this.status)) {
+                throw new Error('Cannot add executor outside of module init');
+              }
+              const executor: IExecutor = {
+                match: '*',
+                priority: 0,
+                exception: 'throw',
+                ..._executor,
+              };
+              executor.match = `${module.name}:${executor.match}`;
+              module.executors.push(executor);
+              this.executors.push(executor);
+              debug(`init ${module.name} executor ${executor.match}`);
+              return executor;
+            },
+            setStatus: (status, message) => {
+              module.status = status;
+              module.message = message;
+            },
           },
         );
-        // the module might have disabled itself by setting enabled to false
       } else {
         debug(`init* ${module.name}`);
       }
     }
 
-    // register all executors
-    for (const module of modules) {
-      this.executors.push(
-        ...module.executors.map((x) => ({
-          // add module to matcher
-          ...x,
-          match: { ...x.match, module: module.name },
-        })),
-      );
-    }
+    this.status = 'loading-tasks';
 
     /**
-     * Initialize all module requests
+     * Init all tasks
      */
     for (const module of modules) {
-      for (const request of module.requests.filter((x) => Object.keys(x.match).length > 0)) {
-        request.module = module;
-        const requestExecutors: {
-          disabled: boolean;
-          context: {
-            state?: Record<string, any>;
-          };
-          executor: ScaffoldingExecutor;
-        }[] = [];
-        for await (const exe of this.executors) {
-          if (!exe.match || !Object.entries(request.match).every(([key, value]) => exe.match[key] === value)) {
-            continue;
-          }
-          if (exe.init) {
-            /**
-             * ScaffoldingExecutor.init
-             */
-            const { disabled, state } = await exe.init(
-              {
-                request,
-              },
-              {
-                tsMorphProject: this.tsMorphProject,
-                // todo, expand logger for more contextual messages
-                logger: this.logger,
-              },
-              // stub for response
-              {
-                disabled: false,
-                state: {},
-              },
-            );
-            if (!disabled) {
-              // init executor
-              debug(
-                `init ${module.name}\t -> ${exe?.match.module} \t${exe?.description ? ` -> ${exe.description}` : ''}`,
-              );
-            } else {
-              debug(
-                `disabled ${module.name}\t -> ${exe?.match.module} \t${exe?.description ? ` -> ${exe.description}` : ''}`,
-              );
-            }
-            requestExecutors.push({
-              disabled: !!disabled,
-              context: {
-                state,
-              },
-              executor: exe,
-            });
-          } else {
-            debug(
-              `init* ${module.name}\t -> ${exe?.match.module} \t${exe?.description ? ` -> ${exe.description}` : ''}`,
-            );
-            requestExecutors.push({
-              disabled: false,
-              context: {},
-              executor: exe,
-            });
-          }
-        }
-        request.executors = requestExecutors;
-        if (request.executors.length === 0 && !request.optional) {
-          // todo, add more context to the error message
-          throw new Error(
-            `No executors found for ${module.name} ${request.description ? ` -> ${request.description}` : ''}`,
-          );
-        }
+      for (const request of module.requests) {
+        await initRequest(request, module);
       }
     }
   }
 
   /**
-   * Execute all modules
+   * Execute all tasks
    */
   async exec() {
-    const modules = Object.values(this.modulesDict)
-      // filter out disabled modules
-      .filter((x) => x.enabled)
-      // order by priority
-      .sort((a, b) => a.priority - b.priority);
+    // sort tasks by priority
+    const queue = this.tasks.filter((x) => x.status === 'queued').toSorted((a, b) => a.priority - b.priority);
 
-    for await (const module of modules) {
-      /**
-       * ScaffoldingModuleAbstract.exec
-       */
-      // const { store } =
-      await module.exec(
-        {
-          cwd: this.cwd,
-          modules: this.modulesDict,
-          config: this.config[module.name!],
-          store: {}, // todo pass in persisted store
-          arguments: {}, // todo, pass in run arguments
-        },
-        {
+    while (queue.length > 0) {
+      const task = queue.shift();
+      if (task?.status !== 'queued') {
+        continue;
+      }
+      if (!task.executor.exec) {
+        throw new Error(`Queued task ${task.executor.match} does not have an exec method`);
+      }
+      try {
+        await task.executor.exec(task, {
           tsMorphProject: this.tsMorphProject,
-          // todo, expand logger for more contextual messages
-          logger: this.logger,
-        },
-      );
-      // todo, persist the returned store
+        });
+        task.status = 'completed';
+      } catch (e: any) {
+        task.message = e.message;
+        task.status = 'error';
+        if (task.executor.exception === 'throw') {
+          // fatal error
+          throw e;
+        }
+      }
     }
 
-    // apply code changes
+    // apply typescript changes
     await this.tsMorphProject.save();
-  }
-
-  /**
-   * De-register all modules
-   */
-  reset() {
-    for (const key in this.modulesDict) {
-      delete this.modulesDict[key];
-    }
   }
 }

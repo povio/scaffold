@@ -1,146 +1,84 @@
 import type { Project } from 'ts-morph';
-import { z } from 'zod';
-
-export type ScaffoldingModuleLogger = (level: 'info' | 'warn' | 'error', message: string, context?: string) => void;
-
-export interface ScaffoldingModuleAbstract<ConfigSchema extends z.ZodObject<any, any, any>> {
-  /**
-   * Unique name
-   */
-  name?: string;
-
-  /**
-   * If this module is enabled
-   *  - run init and executor
-   *  - can disable itself at init
-   */
-  enabled: boolean;
-
-  /**
-   *
-   */
-  priority: number;
-
-  /**
-   * Requests this module made
-   */
-  requests: ScaffoldingRequest[];
-
-  /**
-   * Executors this module provides
-   */
-  executors: ScaffoldingExecutor[];
-
-  /**
-   * Zod config schema
-   *  validated before init, if provided
-   */
-  configSchema?: ConfigSchema;
-
-  /**
-   * Config instance
-   */
-  config?: Record<string, any>;
-
-  /**
-   * Initialize the module
-   *  - introduce requests and executors, based on options and contexts
-   *  - this is run once all modules are registered
-   */
-  init?(
-    context: {
-      /**
-       * path to root of the project
-       */
-      cwd: string;
-      /**
-       * all other loaded modules
-       */
-      modules: Record<string, ScaffoldingModuleAbstract<any>>;
-      // todo checked-in config, zod validated
-      config?: z.infer<ConfigSchema>;
-      // todo checked-in store, not validated
-      store: Record<string, any>;
-      // todo passed in arguments, zod validated
-      arguments: Record<string, any>;
-    },
-    plugins: {
-      // ts-morph instance, applied at end of executions
-      tsMorphProject: Project;
-      logger: ScaffoldingModuleLogger;
-    },
-  ): Promise<void>;
-
-  exec(
-    context: {
-      cwd: string;
-      modules: Record<string, ScaffoldingModuleAbstract<any>>;
-      config?: z.infer<ConfigSchema>;
-      store: Record<string, any>;
-      arguments: Record<string, any>;
-    },
-    plugins: {
-      tsMorphProject: Project;
-      logger: ScaffoldingModuleLogger;
-    },
-  ): Promise<{
-    // todo, check-in
-    store?: Record<string, any>;
-  }>;
-}
+import type { z } from 'zod';
 
 /**
- * An executor, exposed by ScaffoldingModules
- *  - can be dynamically enabled and modified by the ScaffoldingModule
- *     based on the context
- *  - can allow requesting modules to execute by setting exec
+ * Declarative request for a certain status
+ *  - can be handled by multiple executors
+ *  - executors are run by their modules
+ *  - priority is of the request determines the order of execution
+ *     of all requests made to the executing module
  */
-export interface ScaffoldingExecutor {
-  /**
-   * Human-readable description
-   *  todo, use in UI
-   */
+export interface IRequest {
+  // Module that made the request
+  module: IModule<any>;
+
+  // Description for the request
   description?: string;
 
   /**
-   * What requests this executor can handle
-   *  requests can ask for this module in specific or
-   *  match by any other key-value
+   * Matching string used to find the executor
+   * - Set the module to match only one module/executor
+   * - `[module]:[match]`
    */
-  match: Record<string, any> & { module?: string };
+  match: string;
+
+  // Value passed to the executor
+  value?: Record<string, any>;
+
+  // If true, no executors found will not cause an error
+  optional?: boolean;
+
+  // Priority of execution
+  priority: number;
+
+  // Status of the request
+  status: 'uninitialised' | 'initialised';
 
   /**
-   * Optional executor instance init
-   *  - should not have any side effects
+   * Executors matched to the request
+   *  - set by the ScaffoldingHandler after all modules have been initialized
+   */
+  tasks: ITask[];
+}
+
+export interface ITask extends ITaskContext {
+  executor: IExecutor;
+  request: IRequest;
+}
+
+/**
+ * Imperative executor of requests
+ *  - idempotent, can detect if it can skip or disable itself
+ *  - runs for each request
+ *  - runs after other executors of the same module in the order
+ *     of their set priority
+ */
+export interface IExecutor {
+  // Human-readable description
+  description?: string;
+
+  /**
+   * Matching string used to match the request
+   *  - the module name is prepended to the match string
+   */
+  match: string;
+
+  // Priority of execution
+  priority: number;
+
+  /**
+   * Optional executor instance init step
+   *  - runs once per request, after all modules have been initialized
    */
   init?: (
-    context: {
-      /**
-       * scaffolding request instance
-       */
-      request: ScaffoldingRequest;
-    },
+    task: ITaskContext,
     plugins: {
       tsMorphProject: Project;
-      logger: ScaffoldingModuleLogger;
     },
-    // response stub
-    response: {
-      disabled?: boolean;
-      state?: Record<string, any>;
-    },
-  ) => Promise<{
-    /**
-     * disable this executor instance
-     *  preventing it from running
-     */
-    disabled?: boolean;
+  ) => Promise<void>;
 
-    /**
-     * executor instance state, passed to the executor
-     */
-    state?: Record<string, any>;
-  }>;
+  // Exception behaviour
+  exception: 'ignore' | 'throw';
 
   /**
    * Optional executor instance run step
@@ -148,64 +86,101 @@ export interface ScaffoldingExecutor {
    *  - plugins can be executed by the ScaffoldingHandler
    */
   exec?: (
-    context: {
-      request: ScaffoldingRequest;
-      // executor instance state
-      state?: Record<string, any>;
-    },
+    task: ITaskContext,
     plugins: {
       tsMorphProject: Project;
-      logger: ScaffoldingModuleLogger;
     },
   ) => Promise<void>;
 }
 
 /**
- * Request a certain state from a module
+ * A work load made from a request and an executor
  */
-export interface ScaffoldingRequest {
+interface ITaskContext {
   /**
-   * requesting module
+   * Executor instance status
+   *  - disabled: executor matched, but it gracefully disabled itself
+   *  - queued: executor matched and is waiting to be executed
+   *  - invalid: executor matched, but it cannot run due to en error
+   *  - completed: exec completed successfully
+   *  - error: error while init/exec
    */
-  module?: ScaffoldingModuleAbstract<any>;
+  status: 'disabled' | 'uninitialised' | 'queued' | 'invalid' | 'completed' | 'error';
 
-  /**
-   * Human-readable description
-   *  todo, use in UI
-   */
+  // Human-readable status message
+  message?: string;
+
+  // global task priority
+  priority: number;
+
+  // Custom status of the executor, passed from executor init to exec
+  data?: Record<string, any>;
+}
+
+/**
+ * Container for executors and requests
+ */
+export interface IModule<ConfigSchema extends z.ZodObject<any, any, any>> {
+  // Globally unique name
+  name?: string;
+
+  // Semantic version of the module
+  version?: string;
+
+  // Human-readable description of the module
   description?: string;
 
   /**
-   * Match executors by this pattern
+   * Module status
+   * - uninitialised: module has not been initialized, config is not set or validated
+   * - disabled: module has been disabled by the configuration or internal logic
+   * - invalid: module failed to initialize due to missing or invalid context
+   * - queued: module has requests to process
+   * - completed: module has completed all requests
    */
-  match: Record<string, any> & { module?: string };
+  status: 'uninitialised' | 'queued' | 'disabled' | 'invalid' | 'completed';
+
+  // Human-readable status message
+  message?: string;
+
+  // Requests made by this module
+  requests: IRequest[];
+
+  // Executors provided by this module
+  executors: IExecutor[];
+
+  // Tasks created by the requests
+  tasks: ITask[];
 
   /**
-   * Values to be used in the executors
+   * Zod config schema
+   *  validated before init
    */
-  values: any;
+  configSchema?: ConfigSchema;
+
+  // Config instance
+  config?: Record<string, any>;
 
   /**
-   * Optional requests do not raise en exception if a match is not found
+   * Initialize the module
+   *  - introduce requests and executors
+   *  - all modules and their configs are resolved
    */
-  optional?: boolean;
-
-  /**
-   * Executor to be used for this request
-   */
-  executors?: {
-    /**
-     * Disable this executor instance
-     *  preventing it from running
-     */
-    disabled: boolean;
-
-    context: {
-      /**
-       * state passed in from the executor instance init
-       */
-      state?: Record<string, any>;
-    };
-    executor: ScaffoldingExecutor;
-  }[];
+  init?: IModuleInit<ConfigSchema>;
 }
+
+export type IModuleInit<ConfigSchema extends z.ZodObject<any, any, any>> = (
+  context: {
+    // Path to root of the project
+    cwd: string;
+    // All registered and their configs
+    modules: Record<string, IModule<any>>;
+    // Zod-validated config
+    config?: z.infer<ConfigSchema>;
+  },
+  actions: {
+    addRequest: (request: Partial<IRequest> & { match: string }) => Promise<IRequest>;
+    addExecutor: (executor: Partial<IExecutor>) => Promise<IExecutor>;
+    setStatus: (status: IModule<any>['status'], message?: string) => void;
+  },
+) => Promise<void>;

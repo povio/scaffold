@@ -1,89 +1,26 @@
-import { debug as _debug } from 'debug';
-import type { Project } from 'ts-morph';
 import { z } from 'zod';
 
-import {
-  type ScaffoldingExecutor,
-  type ScaffoldingModuleAbstract,
-  type ScaffoldingModuleLogger,
-  type ScaffoldingRequest,
-} from './scaffolding.interfaces';
-
-const debug = _debug('scaffold:module');
+import { type IModule } from './scaffolding.interfaces';
 
 /**
  * Define a scaffold module
+ *  - and its actions
  *
- * todo, Options are stored in the 'scaffold.lock' file and are available to the module function
- *  at initialization.
- *
- * Based on the options, the module exposes a set of actions and a set of executors to run the actions.
- *
- * The orchestrator will run the actions and executors in the correct order, store the configuration and a journal
- *  of the actions and executors that were run.
+ * The orchestrator will run the actions and executors in the correct order.
  *
  */
-export class ScaffoldingModule<Schema extends z.ZodObject<any, any, any> = z.ZodObject<any, any, any>>
-  implements ScaffoldingModuleAbstract<Schema>
-{
-  public version: string = '1.0.0';
-  public priority: number = 50;
-  public enabled = true;
-  public configSchema?: Schema;
-  public config?: z.infer<Schema>;
-
-  constructor(
-    public name?: string,
-    public requests: ScaffoldingRequest[] = [],
-    public executors: ScaffoldingExecutor[] = [],
-  ) {}
-
-  /**
-   * Execute the module requests
-   *  by default, this will execute all the requests, made by this module in order of creation
-   *  when the order is important, or there are additional tasks, you can extend this class
-   *
-   *  ScaffoldingModuleAbstract.exec
-   */
-  public async exec(
-    context: {
-      cwd: string;
-      modules: Record<string, ScaffoldingModuleAbstract<any>>;
-      config: z.infer<Schema>;
-      store: Record<string, any>;
-      arguments: Record<string, any>;
-    },
-    plugins: {
-      tsMorphProject: Project;
-      logger: ScaffoldingModuleLogger;
-    },
-  ) {
-    for await (const request of this.requests) {
-      if (!request.executors || request.executors.length < 1) {
-        debug(`no executors on ${this.name} for request ${request.description || JSON.stringify(request.match)}`);
-        continue;
-      }
-      for (const ex of request.executors) {
-        if (!ex.executor.exec || ex.disabled) {
-          continue;
-        }
-        debug(
-          `execute ${this.name} -> ${ex.executor.match.module} ${ex.executor.description ? ` -> ${ex.executor.description}` : ''}`,
-        );
-        /**
-         * ScaffoldingExecutor.exec
-         */
-        await ex.executor.exec(
-          {
-            request,
-            state: ex.context.state,
-          },
-          plugins,
-        );
-      }
-    }
-    return {
-      // store
-    };
-  }
+export function scaffolding<ConfigSchema extends z.ZodObject<any, any, any>>(
+  module: Pick<
+    Partial<IModule<ConfigSchema>>,
+    'name' | 'version' | 'description' | 'requests' | 'executors' | 'configSchema' | 'init'
+  >,
+): IModule<ConfigSchema> {
+  return {
+    status: 'uninitialised',
+    version: '1.0.0',
+    requests: [],
+    executors: [],
+    tasks: [],
+    ...module,
+  };
 }
