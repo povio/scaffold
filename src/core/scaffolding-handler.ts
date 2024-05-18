@@ -91,7 +91,9 @@ export class ScaffoldingHandler {
         request.description = request.match;
       }
 
-      // todo, make proper matcher
+      /**
+       * todo: match `*:some-request`
+       */
       const executors = this.executors.filter((x) => x.match === request.match);
       if (executors.length < 1 && !request.optional) {
         request.status = 'error';
@@ -103,12 +105,18 @@ export class ScaffoldingHandler {
         const task: ITask = {
           request,
           executor,
-          // todo, compute priority
-          priority: executor.priority + request.priority * 0.1,
+          /**
+           * Priority of the task
+           *  - take the executor priority to determine the global project priority
+           *     of the type of task
+           *  - add a small fraction of the request priority to determine the
+           *      priority of the task within all the same type of tasks
+           */
+          priority: executor.priority + request.priority / 1000,
           status: 'uninitialised',
         };
 
-        debug(`init ${request.module.name} "${request.description}" task "${executor.match}"`);
+        debug(`init task:${task.priority} ${request.module.name} "${request.description}" "${executor.match}"`);
 
         if (executor.init) {
           await executor.init(task, {
@@ -188,10 +196,11 @@ export class ScaffoldingHandler {
         createRequest({ description: 'Before all tasks', match: `${module.name}:#before-all`, module }),
       );
     }
-    for (const module of modules) {
-      for (const request of module.requests.toSorted((a, b) => a.priority - b.priority)) {
-        await initRequest(request);
-      }
+    for (const request of modules
+      .map((x) => x.requests)
+      .flat()
+      .toSorted((a, b) => a.priority - b.priority)) {
+      await initRequest(request);
     }
     for (const module of modules) {
       await initRequest(createRequest({ description: 'After all tasks', match: `${module.name}:#after-all`, module }));

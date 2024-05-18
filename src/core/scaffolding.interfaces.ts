@@ -30,7 +30,9 @@ export interface IRequest {
    */
   optional?: boolean;
 
-  // Priority of execution
+  /**
+   * Priority of initialization of a request/task
+   */
   priority: number;
 
   // Status of the request
@@ -68,7 +70,9 @@ export interface IExecutor {
    */
   match: string;
 
-  // Priority of execution
+  /**
+   * Used in calculating the priority of the task
+   */
   priority: number;
 
   /**
@@ -115,7 +119,11 @@ interface ITaskContext {
   // Human-readable status message
   message?: string;
 
-  // global task priority
+  /**
+   *  Global task priority
+   *    - determines the order of execution of all tasks
+   *    - low priority tasks are executed first
+   */
   priority: number;
 
   // Custom status of the executor, passed from executor init to exec

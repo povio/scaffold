@@ -157,7 +157,8 @@ an_object:
       name: 'need-stuff-done',
       requests: [
         {
-          priority: 100, // higher priority to capture the [all] stage
+          description: 'create an_object section or just add key3',
+          priority: 15, // higher priority to capture the [all] stage
           match: 'config',
           value: { state: 'subset', stage: '[all]', value: { an_object: { key3: 'value3' } } },
         },
@@ -170,6 +171,7 @@ an_object:
       name: 'need-stuff-done-too',
       requests: [
         {
+          priority: 10,
           match: 'config',
           value: { state: 'subset', stage: 'my-app-prd', value: { another_object: { keyB: 'valueC' } } },
         },
