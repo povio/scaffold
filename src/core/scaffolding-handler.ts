@@ -1,14 +1,21 @@
-import { debug as _debug } from 'debug';
 import { Project } from 'ts-morph';
+import { type z } from 'zod';
 
 import { loadConfig } from './scaffolding-config';
-import type { IExecutor, IModule, IRequest, ITask } from './scaffolding.interfaces';
-
-const debug = _debug('scaffold:handler');
+import type {
+  IEventHandler,
+  IExecutor,
+  IMessage,
+  IModule,
+  IModuleStub,
+  IRequest,
+  ITask,
+} from './scaffolding.interfaces';
 
 export class ScaffoldingHandler {
   // All modules
   public readonly modulesDict: Record<string, IModule<any>> = {};
+  public readonly moduleStubDict: Record<string, IModuleStub<any>> = {};
 
   // Raw cosmiconfig
   public readonly rawConfig: Record<string, any> = {};
@@ -32,20 +39,31 @@ export class ScaffoldingHandler {
     | 'done'
     | 'error' = 'uninitialized';
 
-  constructor(public readonly cwd: string = process.cwd()) {
+  constructor(
+    public readonly cwd: string = process.cwd(),
+    private readonly onEvent: IEventHandler = () => {},
+  ) {
     this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
     this.rawConfig = loadConfig(this.cwd);
   }
 
-  register(module: IModule<any>) {
+  public register<ConfigSchema extends z.ZodObject<any, any, any>>(module: IModuleStub<ConfigSchema>) {
+    if (this.status !== 'uninitialized') {
+      throw new Error(`Cannot register module after initialization: ${this.status}`);
+    }
+
     if (!module.name) {
       throw new Error('name is required');
     }
-    if (module.name in this.modulesDict) {
+
+    if (module.name in this.moduleStubDict) {
       throw new Error(`ScaffoldingModule ${module.name} already exists`);
     }
-    // debug(`register ${module.name}`);
-    this.modulesDict[module.name] = module;
+
+    module.type = 'module-stub';
+
+    this.moduleStubDict[module.name] = module;
+    this.onEvent(module, 'register');
     return module;
   }
 
@@ -53,27 +71,30 @@ export class ScaffoldingHandler {
    * Initialize all modules
    */
   async init() {
-    const modules = Object.values(this.modulesDict);
+    this.status = 'configuring';
+    this.onEvent(this, 'configuring');
 
     /**
      * Load config for all modules
      */
-    this.status = 'configuring';
-    for (const module of modules) {
-      let config = module.name! in this.rawConfig ? this.rawConfig[module.name!] : undefined;
-      if (module.configSchema) {
+    for (const moduleStub of Object.values(this.moduleStubDict)) {
+      let config = moduleStub.name! in this.rawConfig ? this.rawConfig[moduleStub.name!] : undefined;
+      if (moduleStub.configSchema) {
         // validate the config if schema is provided
-        const { success, data, error } = await module.configSchema.safeParseAsync(config || {});
+        const { success, data, error } = await moduleStub.configSchema.safeParseAsync(config || {});
         if (!success) {
-          throw new Error(`Invalid config for ${module.name}: ${error}`);
+          throw new Error(`Invalid config for ${moduleStub.name}: ${error}`);
         }
         config = data;
       }
-      module.config = config;
+      moduleStub.config = config;
+      this.onEvent(moduleStub, 'configure', config);
     }
 
     const createRequest = (request: Partial<IRequest> & { module: IModule<any>; match: string }): IRequest => {
       return {
+        type: 'request',
+        messages: [],
         status: 'uninitialised',
         priority: 0,
         optional: false,
@@ -96,13 +117,18 @@ export class ScaffoldingHandler {
        */
       const executors = this.executors.filter((x) => x.match === request.match);
       if (executors.length < 1 && !request.optional) {
-        request.status = 'error';
-        request.message = 'No executors were matched for non-optional request';
+        request.status = 'disabled';
+        const message: IMessage = { type: 'info', message: 'No executors were matched for non-optional request' };
+        request.messages.push(message);
+        this.onEvent(request, 'message', message);
+        this.onEvent(request, 'init');
         return request;
       }
 
       for (const executor of executors) {
         const task: ITask = {
+          type: 'task',
+          messages: [],
           request,
           executor,
           /**
@@ -115,8 +141,6 @@ export class ScaffoldingHandler {
           priority: executor.priority + request.priority / 1000,
           status: 'uninitialised',
         };
-
-        debug(`init task:${task.priority} ${request.module.name} "${request.description}" "${executor.match}"`);
 
         if (executor.init) {
           await executor.init(task, {
@@ -134,8 +158,11 @@ export class ScaffoldingHandler {
 
         // add to global tasks for execution
         this.tasks.push(task);
+
+        this.onEvent(task, 'init');
       }
 
+      this.onEvent(request, 'init');
       return request;
     };
 
@@ -143,74 +170,117 @@ export class ScaffoldingHandler {
      * Find all executors
      */
     this.status = 'loading-executors';
-    for (const module of modules) {
+    this.onEvent(this, 'loading-executors');
+    for (const moduleStub of Object.values(this.moduleStubDict)) {
+      const module: IModule<any> = {
+        ...moduleStub,
+        type: 'module',
+        status: 'uninitialised',
+        requests: [],
+        executors: [],
+        messages: [],
+        tasks: [],
+      };
+      this.modulesDict[module.name] = module;
+
+      const addRequest = async (_request: Partial<IRequest> & { match: string }) => {
+        const request = createRequest({ ..._request, module: _request.module ?? module });
+        module.requests.push(request);
+        this.onEvent(request, 'register');
+        if (['loading-tasks'].includes(this.status)) {
+          await initRequest(request);
+        }
+        return request;
+      };
+
+      const addExecutor = async (_executor: Partial<IExecutor> & { match: string }) => {
+        if (!['loading-executors'].includes(this.status)) {
+          throw new Error('Cannot add executor outside of module init');
+        }
+        const executor: IExecutor = {
+          type: 'executor',
+          module,
+          priority: 0,
+          exception: 'throw',
+          ..._executor,
+        };
+        module.executors.push(executor);
+        this.executors.push(executor);
+        this.onEvent(executor, 'register');
+        return executor;
+      };
+
+      const setStatus = (status: IModule<any>['status']) => {
+        module.status = status;
+        this.onEvent(module, 'status');
+      };
+
+      const addMessage = (type: 'error' | 'warning' | 'info', _message: string) => {
+        const message: IMessage = { type, message: _message };
+        module.messages.push(message);
+        this.onEvent(module, 'message', message);
+      };
+
+      if (moduleStub.executors) {
+        await Promise.all(moduleStub.executors.map(addExecutor));
+      }
+      if (moduleStub.requests) {
+        await Promise.all(moduleStub.requests.map(addRequest));
+      }
+
       if (module.init) {
-        debug(`init ${module.name}`);
         await module.init(
           {
             cwd: this.cwd,
-            modules: this.modulesDict,
+            modules: this.moduleStubDict,
             config: module.config,
           },
           {
-            addRequest: async (_request) => {
-              const request = createRequest({ ..._request, module });
-              module.requests.push(request);
-              if (['loading-tasks'].includes(this.status)) {
-                await initRequest(request);
-              }
-              return request;
-            },
-            addExecutor: async (_executor) => {
-              if (!['loading-executors'].includes(this.status)) {
-                throw new Error('Cannot add executor outside of module init');
-              }
-              const executor: IExecutor = {
-                priority: 0,
-                exception: 'throw',
-                ..._executor,
-              };
-              module.executors.push(executor);
-              this.executors.push(executor);
-              debug(`init ${module.name} executor ${executor.match}`);
-              return executor;
-            },
-            setStatus: (status, message) => {
-              module.status = status;
-              module.message = message;
-            },
+            addRequest,
+            addExecutor,
+            setStatus,
+            addMessage,
           },
         );
-      } else {
-        debug(`init* ${module.name}`);
       }
+      if (module.status === 'uninitialised') {
+        module.status = 'queued';
+      }
+      this.onEvent(module, 'init');
     }
 
     this.status = 'loading-tasks';
+    this.onEvent(this, 'loading-tasks');
 
     /**
      * Init all tasks
      */
-    for (const module of modules) {
+    for (const module of Object.values(this.modulesDict)) {
       await initRequest(
-        createRequest({ description: 'Before all tasks', match: `${module.name}:#before-all`, module }),
+        createRequest({ description: 'Before all tasks', match: `${module.name}:#before-all`, module, optional: true }),
       );
     }
-    for (const request of modules
+    for (const request of Object.values(this.modulesDict)
       .map((x) => x.requests)
       .flat()
       .toSorted((a, b) => a.priority - b.priority)) {
       await initRequest(request);
     }
-    for (const module of modules) {
-      await initRequest(createRequest({ description: 'After all tasks', match: `${module.name}:#after-all`, module }));
+    for (const module of Object.values(this.modulesDict)) {
+      await initRequest(
+        createRequest({ description: 'After all tasks', match: `${module.name}:#after-all`, module, optional: true }),
+      );
     }
+    this.status = 'prepared';
+    this.onEvent(this, 'prepared');
   }
 
   /**
    * Execute all tasks
    */
   async exec() {
+    this.status = 'executing';
+    this.onEvent(this, 'executing');
     // sort tasks by priority
     const queue = this.tasks.filter((x) => x.status === 'queued').toSorted((a, b) => a.priority - b.priority);
 
@@ -223,24 +293,31 @@ export class ScaffoldingHandler {
         throw new Error(`Queued task ${task.executor.match} does not have an exec method`);
       }
       try {
-        debug(
-          `exec ${task.request.module.name}:${task.priority} "${task.request.description}" task "${task.executor.match}"`,
-        );
+        this.onEvent(task, 'exec:before');
         await task.executor.exec(task, {
           tsMorphProject: this.tsMorphProject,
         });
         task.status = 'completed';
       } catch (e: any) {
-        task.message = e.message;
+        const message: IMessage = { type: 'error', message: e.message };
+        task.messages.push(message);
+        this.onEvent(task, 'message', message);
         task.status = 'error';
         if (task.executor.exception === 'throw') {
           // fatal error
           throw e;
+        } else {
+          this.onEvent(task, 'exec:error', e);
         }
       }
+      this.onEvent(task, 'exec:after');
     }
 
     // apply typescript changes
     await this.tsMorphProject.save();
+    this.status = 'done';
+    this.onEvent(this, 'done');
   }
+
+  public readonly type = 'handler' as const;
 }

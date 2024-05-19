@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import { parseDocument, isCollection, type Document } from 'yaml';
 
 import { ScaffoldingHandler } from '../core/scaffolding-handler';
-import { scaffolding } from '../core/scaffolding-module';
+import type { IModuleStub } from '../core/scaffolding.interfaces';
+import { scaffoldingLogger } from '../core/scaffolding-logger';
 
 test('yarn scaffold', async () => {
   const files: Record<
@@ -53,11 +54,11 @@ an_object:
     return files[name] as any;
   }
 
-  const sh = new ScaffoldingHandler();
+  const sh = new ScaffoldingHandler(undefined, scaffoldingLogger);
 
-  const sc1 = scaffolding({
+  const sc1: IModuleStub<any> = {
     name: 'config',
-    init: async (_, { addExecutor, addRequest }) => {
+    init: async (_, { addExecutor, addRequest, addMessage }) => {
       await addExecutor({
         match: 'config',
         priority: 50,
@@ -65,11 +66,10 @@ an_object:
           if (!task.request.value) {
             throw new Error('value is required');
           }
-          task.status = 'completed';
           const { state, stage, value: _value } = task.request.value;
           if (!stage || !state || !_value) {
             task.status = 'invalid';
-            task.message = `stage, value, and state are required for dot-config creation`;
+            addMessage('error', `stage, value, and state are required for dot-config creation`);
             return;
           }
           const value = _value as Record<string, Record<string, any>>;
@@ -83,9 +83,11 @@ an_object:
                 match: 'config',
                 description: `propagating ${stage} to ${s} dot-config`,
                 value: { ...task.request.value, stage: s },
+                module: task.request.module,
               });
             }
-            task.message = `queued ${stage} dot-config`;
+            task.status = 'completed';
+            addMessage('info', `queued ${stage} dot-config for all stages`);
             return;
           }
           const file = get(`${stage}.app.template.yml`);
@@ -113,7 +115,7 @@ an_object:
                   const sectionNode = file.yaml.get(section);
                   if (!isCollection(sectionNode)) {
                     task.status = 'invalid';
-                    task.message = `expected section ${section} to be a collection`;
+                    addMessage('error', `expected section ${section} to be a collection`);
                     return;
                   }
                   for (const [sectionItem, v] of Object.entries(sectionValue)) {
@@ -143,41 +145,36 @@ an_object:
         },
         exec: async () => {
           // update the files
-          // todo test order of execution
-          console.log('updating files');
+          addMessage('info', 'updating dot-config files');
         },
       });
     },
-  });
+  };
 
   sh.register(sc1);
 
-  sh.register(
-    scaffolding({
-      name: 'need-stuff-done',
-      requests: [
-        {
-          description: 'create an_object section or just add key3',
-          priority: 15, // higher priority to capture the [all] stage
-          match: 'config',
-          value: { state: 'subset', stage: '[all]', value: { an_object: { key3: 'value3' } } },
-        },
-      ],
-    }),
-  );
+  sh.register({
+    name: 'need-stuff-done',
+    requests: [
+      {
+        description: 'create an_object section or just add key3',
+        priority: 15, // higher priority to capture the [all] stage
+        match: 'config',
+        value: { state: 'subset', stage: '[all]', value: { an_object: { key3: 'value3' } } },
+      },
+    ],
+  });
 
-  sh.register(
-    scaffolding({
-      name: 'need-stuff-done-too',
-      requests: [
-        {
-          priority: 10,
-          match: 'config',
-          value: { state: 'subset', stage: 'my-app-prd', value: { another_object: { keyB: 'valueC' } } },
-        },
-      ],
-    }),
-  );
+  sh.register({
+    name: 'need-stuff-done-too',
+    requests: [
+      {
+        priority: 10,
+        match: 'config',
+        value: { state: 'subset', stage: 'my-app-prd', value: { another_object: { keyB: 'valueC' } } },
+      },
+    ],
+  });
 
   await sh.init();
   await sh.exec();

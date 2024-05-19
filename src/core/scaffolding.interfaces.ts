@@ -1,6 +1,8 @@
 import type { Project } from 'ts-morph';
 import type { z } from 'zod';
 
+import { ScaffoldingHandler } from './scaffolding-handler';
+
 /**
  * Declarative request for a certain status
  *  - can be handled by multiple executors
@@ -36,21 +38,24 @@ export interface IRequest {
   priority: number;
 
   // Status of the request
-  status: 'uninitialised' | 'initialised' | 'error';
+  status: 'uninitialised' | 'initialised' | 'error' | 'disabled';
 
-  // Human-readable status message
-  message?: string;
+  // Human-readable status messages
+  messages: IMessage[];
 
   /**
    * Executors matched to the request
    *  - set by the ScaffoldingHandler after all modules have been initialized
    */
   tasks: ITask[];
+
+  type: 'request';
 }
 
 export interface ITask extends ITaskContext {
   executor: IExecutor;
   request: IRequest;
+  type: 'task';
 }
 
 /**
@@ -100,6 +105,10 @@ export interface IExecutor {
       tsMorphProject: Project;
     },
   ) => Promise<void>;
+
+  module: IModule<any>;
+
+  type: 'executor';
 }
 
 /**
@@ -117,7 +126,7 @@ interface ITaskContext {
   status: 'disabled' | 'uninitialised' | 'queued' | 'invalid' | 'completed' | 'error';
 
   // Human-readable status message
-  message?: string;
+  messages: IMessage[];
 
   /**
    *  Global task priority
@@ -135,7 +144,7 @@ interface ITaskContext {
  */
 export interface IModule<ConfigSchema extends z.ZodObject<any, any, any>> {
   // Globally unique name
-  name?: string;
+  name: string;
 
   // Semantic version of the module
   version?: string;
@@ -153,8 +162,7 @@ export interface IModule<ConfigSchema extends z.ZodObject<any, any, any>> {
    */
   status: 'uninitialised' | 'queued' | 'disabled' | 'invalid' | 'completed';
 
-  // Human-readable status message
-  message?: string;
+  messages: IMessage[];
 
   // Requests made by this module
   requests: IRequest[];
@@ -180,6 +188,8 @@ export interface IModule<ConfigSchema extends z.ZodObject<any, any, any>> {
    *  - all modules and their configs are resolved
    */
   init?: IModuleInit<ConfigSchema>;
+
+  type: 'module';
 }
 
 export type IModuleInit<ConfigSchema extends z.ZodObject<any, any, any>> = (
@@ -187,13 +197,36 @@ export type IModuleInit<ConfigSchema extends z.ZodObject<any, any, any>> = (
     // Path to root of the project
     cwd: string;
     // All registered and their configs
-    modules: Record<string, IModule<any>>;
+    modules: Record<string, IModuleStub<any>>;
     // Zod-validated config
     config?: z.infer<ConfigSchema>;
   },
   actions: {
     addRequest: (request: Partial<IRequest> & { match: string }) => Promise<IRequest>;
     addExecutor: (executor: Partial<IExecutor> & { match: string }) => Promise<IExecutor>;
-    setStatus: (status: IModule<any>['status'], message?: string) => void;
+    setStatus: (status: IModule<any>['status']) => void;
+    addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
   },
 ) => Promise<void>;
+
+type Optional<T, K extends keyof T> = Partial<Pick<T, K>> & Omit<T, K>;
+
+export type IModuleStub<ConfigSchema extends z.ZodObject<any, any, any>> = Omit<
+  Optional<IModule<ConfigSchema>, 'messages' | 'config' | 'status'>,
+  'requests' | 'executors' | 'tasks' | 'type'
+> & {
+  requests?: Array<Partial<IRequest> & { match: string }>;
+  executors?: Array<Partial<IExecutor> & { match: string }>;
+  type?: 'module-stub';
+};
+
+export interface IMessage {
+  type: 'error' | 'warning' | 'info';
+  message: string;
+}
+
+export type IEventHandler = (
+  source: IModuleStub<any> | IModule<any> | IRequest | IExecutor | ITask | ScaffoldingHandler,
+  event: string,
+  data?: any,
+) => void;

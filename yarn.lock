@@ -394,6 +394,7 @@ __metadata:
     "@types/yargs": "npm:^17.0.32"
     "@typescript-eslint/eslint-plugin": "npm:^7.9.0"
     "@typescript-eslint/parser": "npm:^7.9.0"
+    colorette: "npm:^2.0.20"
     cosmiconfig: "npm:^9.0.0"
     debug: "npm:^4.3.4"
     eslint: "npm:^8.57.0"
