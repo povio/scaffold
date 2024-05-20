@@ -2,8 +2,8 @@ import { test } from 'node:test';
 import { parseDocument, isCollection, type Document } from 'yaml';
 
 import { ScaffoldingHandler } from '../core/scaffolding-handler';
-import type { IModuleStub } from '../core/scaffolding.interfaces';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
+import type { IModuleStub } from '../core/scaffolding.interfaces';
 
 test('yarn scaffold', async () => {
   const files: Record<

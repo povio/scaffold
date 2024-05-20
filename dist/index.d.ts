@@ -41,14 +41,14 @@ interface IExecutor {
     match: string;
     priority: number;
     init?: (task: ITask, actions: {
-        addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+        addMessage: (type: 'error' | 'warning' | 'info', message: string, error?: Error) => IMessage;
         withTsMorph: (func: (context: {
             project: Project;
         }) => Promise<void>) => Promise<void>;
     }) => Promise<void>;
     exception: 'ignore' | 'throw';
     exec?: (task: ITask, actions: {
-        addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+        addMessage: (type: 'error' | 'warning' | 'info', message: string, error?: Error) => IMessage;
         withTsMorph: (func: (context: {
             project: Project;
         }) => Promise<void>) => Promise<void>;
@@ -88,7 +88,7 @@ type IModuleInit<ConfigSchema extends z.ZodObject<any, any, any>> = (context: {
         match: string;
     }) => Promise<IExecutor>;
     setStatus: (status: IModule<any>['status']) => void;
-    addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+    addMessage: (type: 'error' | 'warning' | 'info', message: string, error?: Error) => IMessage;
 }) => Promise<void>;
 type Optional<T, K extends keyof T> = Partial<Pick<T, K>> & Omit<T, K>;
 type IModuleStub<ConfigSchema extends z.ZodObject<any, any, any>> = Omit<Optional<IModule<ConfigSchema>, 'messages' | 'config' | 'status'>, 'requests' | 'executors' | 'tasks' | 'type'> & {
@@ -103,6 +103,7 @@ type IModuleStub<ConfigSchema extends z.ZodObject<any, any, any>> = Omit<Optiona
 interface IMessage {
     type: 'error' | 'warning' | 'info';
     message: string;
+    error?: Error;
 }
 type IEventHandler = (source: IModuleStub<any> | IModule<any> | IRequest | IExecutor | ITask | ScaffoldingHandler, event: string, data?: any) => void;
 

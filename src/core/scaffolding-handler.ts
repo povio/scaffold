@@ -86,9 +86,9 @@ export class ScaffoldingHandler {
           throw new Error(`Invalid config for ${moduleStub.name}: ${error}`);
         }
         config = data;
+        this.onEvent(moduleStub, 'configure', config);
       }
       moduleStub.config = config;
-      this.onEvent(moduleStub, 'configure', config);
     }
 
     const createRequest = (request: Partial<IRequest> & { module: IModule<any>; match: string }): IRequest => {
@@ -117,11 +117,8 @@ export class ScaffoldingHandler {
        */
       const executors = this.executors.filter((x) => x.match === request.match);
       if (executors.length < 1 && !request.optional) {
-        request.status = 'disabled';
-        const message: IMessage = { type: 'info', message: 'No executors were matched for non-optional request' };
-        request.messages.push(message);
-        this.onEvent(request, 'message', message);
-        this.onEvent(request, 'init');
+        request.status = 'error';
+        this.onEvent(request, 'init:error');
         return request;
       }
 
@@ -142,10 +139,11 @@ export class ScaffoldingHandler {
           status: 'uninitialised',
         };
 
-        const addMessage = (type: 'error' | 'warning' | 'info', _message: string) => {
-          const message: IMessage = { type, message: _message };
+        const addMessage = (type: 'error' | 'warning' | 'info', _message: string, error?: Error) => {
+          const message: IMessage = { type, message: _message, error };
           task.messages.push(message);
           this.onEvent(task, 'message', message);
+          return message;
         };
 
         const withTsMorph = async (func: (context: { project: Project }) => Promise<void>) => {
@@ -153,18 +151,22 @@ export class ScaffoldingHandler {
         };
 
         if (executor.init) {
-          await executor.init(task, {
-            addMessage,
-            withTsMorph,
-          });
+          try {
+            await executor.init(task, {
+              addMessage,
+              withTsMorph,
+            });
+          } catch (e: any) {
+            const message: IMessage = { type: 'error', message: e.message };
+            task.messages.push(message);
+            this.onEvent(task, 'message', message);
+            task.status = 'error';
+          }
         }
 
         if (task.status === 'uninitialised') {
           // enqueue task for execution
           task.status = executor.exec ? 'queued' : 'completed';
-        } else if (task.status === 'error') {
-          // fatal error
-          throw new Error(`Task ${task.executor.match} failed to init`);
         }
 
         // add to module tasks for tracking purposes
@@ -173,10 +175,16 @@ export class ScaffoldingHandler {
         // add to global tasks for execution
         this.tasks.push(task);
 
-        this.onEvent(task, 'init');
+        if (task.status === 'error') {
+          // fatal error
+          this.onEvent(task, 'init:error');
+        } else {
+          this.onEvent(task, 'init');
+        }
       }
 
       this.onEvent(request, 'init');
+
       return request;
     };
 
@@ -229,10 +237,11 @@ export class ScaffoldingHandler {
         this.onEvent(module, 'status');
       };
 
-      const addMessage = (type: 'error' | 'warning' | 'info', _message: string) => {
-        const message: IMessage = { type, message: _message };
+      const addMessage = (type: 'error' | 'warning' | 'info', _message: string, error?: Error) => {
+        const message: IMessage = { type, message: _message, error };
         module.messages.push(message);
         this.onEvent(module, 'message', message);
+        return message;
       };
 
       if (moduleStub.executors) {
@@ -243,27 +252,36 @@ export class ScaffoldingHandler {
       }
 
       if (module.init) {
-        await module.init(
-          {
-            cwd: this.cwd,
-            modules: this.moduleStubDict,
-            config: module.config,
-          },
-          {
-            addRequest,
-            addExecutor,
-            setStatus,
-            addMessage,
-          },
-        );
+        try {
+          await module.init(
+            {
+              cwd: this.cwd,
+              modules: this.moduleStubDict,
+              config: module.config,
+            },
+            {
+              addRequest,
+              addExecutor,
+              setStatus,
+              addMessage,
+            },
+          );
+        } catch (e: any) {
+          module.status = 'error';
+          const message: IMessage = { type: 'error', message: e.message };
+          module.messages.push(message);
+          this.onEvent(module, 'message', message);
+        }
       }
       if (module.status === 'uninitialised') {
         module.status = 'queued';
       } else if (module.status === 'error') {
         // fatal error
-        throw new Error(`Module ${module.name} failed to init`);
+        this.onEvent(module, 'error');
+        return;
+      } else {
+        this.onEvent(module, 'init');
       }
-      this.onEvent(module, 'init');
     }
 
     this.status = 'loading-tasks';
@@ -288,8 +306,16 @@ export class ScaffoldingHandler {
         createRequest({ description: 'After all tasks', match: `${module.name}:#after-all`, module, optional: true }),
       );
     }
-    this.status = 'prepared';
-    this.onEvent(this, 'prepared');
+
+    if (
+      this.tasks.some((x) => x.status === 'error') ||
+      Object.values(this.modulesDict).some((x) => x.status === 'error' || x.requests.some((y) => y.status === 'error'))
+    ) {
+      this.status = 'error';
+    } else {
+      this.status = 'prepared';
+      this.onEvent(this, 'prepared');
+    }
   }
 
   /**
@@ -310,12 +336,13 @@ export class ScaffoldingHandler {
         throw new Error(`Queued task ${task.executor.match} does not have an exec method`);
       }
       try {
-        this.onEvent(task, 'exec:before');
+        // this.onEvent(task, 'exec:before');
 
-        const addMessage = (type: 'error' | 'warning' | 'info', _message: string) => {
-          const message: IMessage = { type, message: _message };
+        const addMessage = (type: 'error' | 'warning' | 'info', _message: string, error?: Error) => {
+          const message: IMessage = { type, message: _message, error };
           task.messages.push(message);
           this.onEvent(task, 'message', message);
+          return message;
         };
 
         const withTsMorph = async (func: (context: { project: Project }) => Promise<void>) => {
@@ -339,7 +366,7 @@ export class ScaffoldingHandler {
           this.onEvent(task, 'exec:error', e);
         }
       }
-      this.onEvent(task, 'exec:after');
+      // this.onEvent(task, 'exec:after');
     }
 
     // apply typescript changes

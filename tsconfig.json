@@ -19,8 +19,8 @@
     "forceConsistentCasingInFileNames": false,
     "alwaysStrict": true,
     "paths": {
-      "@povio/scaffold": ["./index.ts"],
+      "@povio/scaffold": ["./index.ts"]
     }
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts"]
 }

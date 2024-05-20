@@ -27,9 +27,11 @@ export const command: yargs.CommandModule = {
       // load all modules
       await sh.init();
 
-      // execute all modules in order
-      // todo, ask for confirmation
-      await sh.exec();
+      if (sh.status !== 'error') {
+        // execute all modules in order
+        // todo, ask for confirmation
+        await sh.exec();
+      }
     } catch (error) {
       // eslint-disable-next-line no-console
       console.error(error);

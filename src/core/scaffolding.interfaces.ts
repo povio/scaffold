@@ -87,7 +87,7 @@ export interface IExecutor {
   init?: (
     task: ITask,
     actions: {
-      addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+      addMessage: (type: 'error' | 'warning' | 'info', message: string, error?: Error) => IMessage;
       withTsMorph: (func: (context: { project: Project }) => Promise<void>) => Promise<void>;
     },
   ) => Promise<void>;
@@ -103,7 +103,7 @@ export interface IExecutor {
   exec?: (
     task: ITask,
     actions: {
-      addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+      addMessage: (type: 'error' | 'warning' | 'info', message: string, error?: Error) => IMessage;
       withTsMorph: (func: (context: { project: Project }) => Promise<void>) => Promise<void>;
     },
   ) => Promise<void>;
@@ -118,7 +118,7 @@ export interface IExecutor {
  */
 interface ITaskContext {
   /**
-   * Executor instance status
+   * Task instance status
    *  - disabled: executor matched, but it gracefully disabled itself
    *  - queued: executor matched and is waiting to be executed
    *  - invalid: executor matched, but it cannot run due to en error
@@ -207,7 +207,7 @@ export type IModuleInit<ConfigSchema extends z.ZodObject<any, any, any>> = (
     addRequest: (request: Partial<IRequest> & { match: string }) => Promise<IRequest>;
     addExecutor: (executor: Partial<IExecutor> & { match: string }) => Promise<IExecutor>;
     setStatus: (status: IModule<any>['status']) => void;
-    addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+    addMessage: (type: 'error' | 'warning' | 'info', message: string, error?: Error) => IMessage;
   },
 ) => Promise<void>;
 
@@ -225,6 +225,7 @@ export type IModuleStub<ConfigSchema extends z.ZodObject<any, any, any>> = Omit<
 export interface IMessage {
   type: 'error' | 'warning' | 'info';
   message: string;
+  error?: Error;
 }
 
 export type IEventHandler = (
