@@ -86,8 +86,9 @@ export interface IExecutor {
    */
   init?: (
     task: ITask,
-    plugins: {
-      tsMorphProject: Project;
+    actions: {
+      addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+      withTsMorph: (func: (context: { project: Project }) => Promise<void>) => Promise<void>;
     },
   ) => Promise<void>;
 
@@ -101,8 +102,9 @@ export interface IExecutor {
    */
   exec?: (
     task: ITask,
-    plugins: {
-      tsMorphProject: Project;
+    actions: {
+      addMessage: (type: 'error' | 'warning' | 'info', message: string) => void;
+      withTsMorph: (func: (context: { project: Project }) => Promise<void>) => Promise<void>;
     },
   ) => Promise<void>;
 
@@ -160,7 +162,7 @@ export interface IModule<ConfigSchema extends z.ZodObject<any, any, any>> {
    * - queued: module has requests to process
    * - completed: module has completed all requests
    */
-  status: 'uninitialised' | 'queued' | 'disabled' | 'invalid' | 'completed';
+  status: 'uninitialised' | 'queued' | 'disabled' | 'invalid' | 'completed' | 'error';
 
   messages: IMessage[];
 

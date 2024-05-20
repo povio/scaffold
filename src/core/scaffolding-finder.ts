@@ -4,7 +4,7 @@ import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { prepare } from 'rechoir';
 
-import type { IModule } from './scaffolding.interfaces';
+import type { IModuleStub } from './scaffolding.interfaces';
 
 /**
  * Import or require a module
@@ -47,7 +47,7 @@ export async function loadModule(path: string): Promise<any> {
   return await tryRequireThenImport(path);
 }
 
-export async function* findScaffoldFiles<SM extends IModule<any>>(context: { cwd: string }): AsyncGenerator<SM> {
+export async function* findScaffoldFiles<SM extends IModuleStub<any>>(context: { cwd: string }): AsyncGenerator<SM> {
   for (const file of await glob(['**/.*.scaffold.*', '**/.scaffold.*'], {
     cwd: context.cwd,
     dot: true, // allow dot files

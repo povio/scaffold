@@ -142,15 +142,29 @@ export class ScaffoldingHandler {
           status: 'uninitialised',
         };
 
+        const addMessage = (type: 'error' | 'warning' | 'info', _message: string) => {
+          const message: IMessage = { type, message: _message };
+          task.messages.push(message);
+          this.onEvent(task, 'message', message);
+        };
+
+        const withTsMorph = async (func: (context: { project: Project }) => Promise<void>) => {
+          await func({ project: this.tsMorphProject });
+        };
+
         if (executor.init) {
           await executor.init(task, {
-            tsMorphProject: this.tsMorphProject,
+            addMessage,
+            withTsMorph,
           });
         }
 
         if (task.status === 'uninitialised') {
           // enqueue task for execution
           task.status = executor.exec ? 'queued' : 'completed';
+        } else if (task.status === 'error') {
+          // fatal error
+          throw new Error(`Task ${task.executor.match} failed to init`);
         }
 
         // add to module tasks for tracking purposes
@@ -245,6 +259,9 @@ export class ScaffoldingHandler {
       }
       if (module.status === 'uninitialised') {
         module.status = 'queued';
+      } else if (module.status === 'error') {
+        // fatal error
+        throw new Error(`Module ${module.name} failed to init`);
       }
       this.onEvent(module, 'init');
     }
@@ -294,8 +311,20 @@ export class ScaffoldingHandler {
       }
       try {
         this.onEvent(task, 'exec:before');
+
+        const addMessage = (type: 'error' | 'warning' | 'info', _message: string) => {
+          const message: IMessage = { type, message: _message };
+          task.messages.push(message);
+          this.onEvent(task, 'message', message);
+        };
+
+        const withTsMorph = async (func: (context: { project: Project }) => Promise<void>) => {
+          await func({ project: this.tsMorphProject });
+        };
+
         await task.executor.exec(task, {
-          tsMorphProject: this.tsMorphProject,
+          addMessage,
+          withTsMorph,
         });
         task.status = 'completed';
       } catch (e: any) {
@@ -320,4 +349,14 @@ export class ScaffoldingHandler {
   }
 
   public readonly type = 'handler' as const;
+}
+
+/**
+ * Helper function that returns a module stub
+ * to abstract away the type of the module
+ */
+export function createScaffolding<ConfigSchema extends z.ZodObject<any, any, any>>(
+  data: IModuleStub<ConfigSchema>,
+): IModuleStub<ConfigSchema> {
+  return data;
 }
