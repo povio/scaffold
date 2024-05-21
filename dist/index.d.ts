@@ -9,6 +9,7 @@ declare class ScaffoldingHandler {
     readonly rawConfig: Record<string, any>;
     readonly executors: IExecutor[];
     readonly tasks: ITask[];
+    readonly requests: IRequest[];
     readonly tsMorphProject: Project;
     status: 'uninitialized' | 'configuring' | 'loading-executors' | 'loading-tasks' | 'prepared' | 'executing' | 'done' | 'error';
     constructor(cwd?: string, onEvent?: IEventHandler);

@@ -26,6 +26,9 @@ export class ScaffoldingHandler {
   // All tasks
   public readonly tasks: ITask[] = [];
 
+  // All requests
+  public readonly requests: IRequest[] = [];
+
   // TsMorph Project of the current codebase
   public readonly tsMorphProject;
 
@@ -208,6 +211,8 @@ export class ScaffoldingHandler {
       const addRequest = async (_request: Partial<IRequest> & { match: string }) => {
         const request = createRequest({ ..._request, module: _request.module ?? module });
         module.requests.push(request);
+        this.requests.push(request);
+        this.requests.sort((a, b) => a.priority - b.priority);
         this.onEvent(request, 'register');
         if (['loading-tasks'].includes(this.status)) {
           await initRequest(request);
@@ -295,11 +300,8 @@ export class ScaffoldingHandler {
         createRequest({ description: 'Before all tasks', match: `${module.name}:#before-all`, module, optional: true }),
       );
     }
-    for (const request of Object.values(this.modulesDict)
-      .map((x) => x.requests)
-      .flat()
-      .toSorted((a, b) => a.priority - b.priority)) {
-      await initRequest(request);
+    while (this.requests.length > 0) {
+      await initRequest(this.requests.shift()!);
     }
     for (const module of Object.values(this.modulesDict)) {
       await initRequest(
