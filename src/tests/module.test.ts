@@ -3,7 +3,7 @@ import { parseDocument, isCollection, type Document } from 'yaml';
 
 import { ScaffoldingHandler } from '../core/scaffolding-handler';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
-import type { IModuleStub } from '../core/scaffolding.interfaces';
+import { IModule } from '../core/scaffolding.interfaces';
 
 test('yarn scaffold', async () => {
   const files: Record<
@@ -14,7 +14,7 @@ test('yarn scaffold', async () => {
       yaml?: Document.Parsed;
     }
   > = {
-    'my-app-dev.app.template.yml': {
+    'myapp-dev.app.template.yml': {
       content: `
 example:
  - one: 1
@@ -28,7 +28,7 @@ example:
  - two: 2
       `,
     },
-    'my-app-stg.app.template.yml': {
+    'myapp-stg.app.template.yml': {
       content: `
 an_object:
   key1: value1
@@ -56,7 +56,7 @@ an_object:
 
   const sh = new ScaffoldingHandler(undefined, scaffoldingLogger);
 
-  const sc1: IModuleStub<any> = {
+  const sc1: IModule<any> = {
     name: 'config',
     init: async (_, { addExecutor, addRequest, addMessage }) => {
       await addExecutor({
@@ -68,7 +68,7 @@ an_object:
           }
           const { state, stage, value: _value } = task.request.value;
           if (!stage || !state || !_value) {
-            task.status = 'invalid';
+            task.status = 'error';
             addMessage('error', `stage, value, and state are required for dot-config creation`);
             return;
           }
@@ -83,7 +83,7 @@ an_object:
                 match: 'config',
                 description: `propagating ${stage} to ${s} dot-config`,
                 value: { ...task.request.value, stage: s },
-                module: task.request.module,
+                module: task.request.module, // override module
               });
             }
             task.status = 'completed';
@@ -114,7 +114,7 @@ an_object:
                 } else {
                   const sectionNode = file.yaml.get(section);
                   if (!isCollection(sectionNode)) {
-                    task.status = 'invalid';
+                    task.status = 'error';
                     addMessage('error', `expected section ${section} to be a collection`);
                     return;
                   }
@@ -171,7 +171,7 @@ an_object:
       {
         priority: 10,
         match: 'config',
-        value: { state: 'subset', stage: 'my-app-prd', value: { another_object: { keyB: 'valueC' } } },
+        value: { state: 'subset', stage: 'myapp-prd', value: { another_object: { keyB: 'valueC' } } },
       },
     ],
   });

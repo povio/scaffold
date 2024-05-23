@@ -46,6 +46,11 @@ export const scaffoldingLogger: IEventHandler = (source, event, data) => {
         case 'init': {
           break;
         }
+        case 'init:error': {
+          console.log(`${blue(source.module.name)} [request:${event}] [match:${source.match}]`);
+          if (data) console.log(data);
+          break;
+        }
         default: {
           console.log(`${blue(source.module.name)} [request:${event}] [match:${source.match}]`);
           if (data) console.log(data);

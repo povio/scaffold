@@ -19,19 +19,18 @@ export const command: yargs.CommandModule = {
       type: 'boolean',
       default: false,
     },
+    yes: {
+      describe: 'Auto-apply',
+      type: 'boolean',
+      default: false,
+    },
   },
   handler: async (args) => {
     try {
       const cwd = args.cwd as string;
       const verbose = args.verbose as boolean;
 
-      const logger = verbose
-        ? (source: any, event: any, data?: any) =>
-            // eslint-disable-next-line no-console
-            console.log(event, inspect(source, { showHidden: false, depth: 2, colors: true }), data)
-        : scaffoldingLogger;
-
-      const sh = new ScaffoldingHandler(cwd, logger);
+      const sh = new ScaffoldingHandler(cwd, scaffoldingLogger);
 
       for await (const module of findScaffoldFiles({ cwd })) {
         sh.register(module);

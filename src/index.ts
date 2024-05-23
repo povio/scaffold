@@ -2,7 +2,6 @@ export type {
   IModule,
   IExecutor,
   IRequest,
-  IModuleStub,
   IModuleInit,
   ITask,
   IMessage,
