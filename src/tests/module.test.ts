@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import { parseDocument, isCollection, type Document } from 'yaml';
 
-import { ScaffoldingHandler } from '../core/scaffolding-handler';
+import { Handler } from '../core/scaffolding-handler';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
 import { IModule } from '../core/scaffolding.interfaces';
 
@@ -54,13 +54,14 @@ an_object:
     return files[name] as any;
   }
 
-  const sh = new ScaffoldingHandler(undefined, scaffoldingLogger);
+  const sh = new Handler(undefined, scaffoldingLogger);
 
   const sc1: IModule<any> = {
-    name: 'config',
+    name: 'an-config-module',
     init: async (_, { addExecutor, addRequest, addMessage }) => {
       await addExecutor({
-        match: 'config',
+        match: 'an-config-module',
+        description: 'prepare dot-config file changes',
         priority: 50,
         init: async (task) => {
           if (!task.request.value) {
@@ -80,7 +81,7 @@ an_object:
             }
             for (const s of [...stages.keys()]) {
               await addRequest({
-                match: 'config',
+                match: 'an-config-module',
                 description: `propagating ${stage} to ${s} dot-config`,
                 value: { ...task.request.value, stage: s },
                 module: task.request.module, // override module
@@ -135,8 +136,8 @@ an_object:
       });
 
       await addExecutor({
-        match: 'config:#after-all',
-        description: 'update dot-config files',
+        match: 'an-config-module:#after-all',
+        description: 'save dot-config files',
         init: async (task) => {
           // check if we need to update the files
           if (!Object.values(files).some((f) => f.save)) {
@@ -159,7 +160,7 @@ an_object:
       {
         description: 'create an_object section or just add key3',
         priority: 15, // higher priority to capture the [all] stage
-        match: 'config',
+        match: 'an-config-module',
         value: { state: 'subset', stage: '[all]', value: { an_object: { key3: 'value3' } } },
       },
     ],
@@ -170,7 +171,7 @@ an_object:
     requests: [
       {
         priority: 10,
-        match: 'config',
+        match: 'an-config-module',
         value: { state: 'subset', stage: 'myapp-prd', value: { another_object: { keyB: 'valueC' } } },
       },
     ],

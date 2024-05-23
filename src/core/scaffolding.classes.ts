@@ -1,7 +1,7 @@
-import type { IExecutorParams, IHandler, IRequest, ITask, IZod } from './scaffolding.interfaces';
+import type { IExecutorParams, IHandler, IRequest, ITask, IZod, Observable } from './scaffolding.interfaces';
 import type { IExecutor, IMessage, IModule, IModuleInit } from './scaffolding.interfaces';
 
-export class Module<ConfigSchema extends IZod> {
+export class Module<ConfigSchema extends IZod> implements Observable {
   constructor(
     props: Omit<IModule<ConfigSchema>, 'addRequest'>,
     private handler: IHandler,
@@ -9,7 +9,6 @@ export class Module<ConfigSchema extends IZod> {
     this.name = props.name;
     this.version = props.version ?? '1.0.0';
     this.description = props.description;
-    this._status = 'uninitialised';
     this.messages = [];
     this._init = props.init;
     this.tasks = [];
@@ -23,6 +22,10 @@ export class Module<ConfigSchema extends IZod> {
     this.handler.onEvent('register', this, props);
   }
 
+  get id() {
+    return this.name;
+  }
+
   // Globally unique name
   public readonly name: string;
   // Semantic version of the module
@@ -30,26 +33,25 @@ export class Module<ConfigSchema extends IZod> {
   // Human-readable description of the module
   public readonly description?: string;
 
-  /**
-   * Module status
-   * - uninitialised: module has not been initialized, config is not set or validated
-   * - disabled: module has been disabled by the configuration or internal logic
-   * - queued: module has requests to process
-   * - completed: module has completed all requests
-   * - error: module has encountered an error
-   */
-  private _status: 'uninitialised' | 'initialised' | 'error';
+  private _status: 'uninitialized' | 'error' | 'disabled' | 'queued' = 'uninitialized';
 
   public get status() {
     return this._status;
   }
 
-  private set status(status: Module<any>['_status']) {
+  public set status(status: Module<ConfigSchema>['_status']) {
     this._status = status;
     this.handler.onEvent('status', this, status);
   }
 
   messages: IMessage[];
+
+  public addMessage(type: IMessage['type'], message: string, error?: Error) {
+    const msg = { type, message, error, status: this.status };
+    this.messages.push(msg);
+    this.handler.onEvent('message', this, msg);
+    return msg;
+  }
 
   private readonly _requests: IModule<ConfigSchema>['requests'];
   private readonly _executors: IModule<ConfigSchema>['executors'];
@@ -81,13 +83,6 @@ export class Module<ConfigSchema extends IZod> {
     }
   }
 
-  public addMessage(type: IMessage['type'], message: string, error?: Error) {
-    const msg = { type, message, error };
-    this.messages.push(msg);
-    this.handler.onEvent('message', this, msg);
-    return msg;
-  }
-
   /**
    * Initialize the module
    *  - introduce requests and executors
@@ -97,7 +92,7 @@ export class Module<ConfigSchema extends IZod> {
     config: Parameters<IModuleInit<ConfigSchema>>[0],
     _plugins: Omit<Parameters<IModuleInit<ConfigSchema>>[1], 'addMessage' | 'setStatus'>,
   ) {
-    if (this.status !== 'uninitialised') {
+    if (this.status !== 'uninitialized') {
       throw new Error('Module has already been initialized');
     }
     const plugins: Parameters<IModuleInit<ConfigSchema>>[1] = {
@@ -121,8 +116,8 @@ export class Module<ConfigSchema extends IZod> {
       this.addMessage('error', 'Error while initializing module', error);
       this.status = 'error';
     }
-    if (this.status === 'uninitialised') {
-      this.status = 'initialised';
+    if (this.status === 'uninitialized') {
+      this.status = this.requests.length < 1 && this.executors.length < 1 ? 'disabled' : 'queued';
     }
   }
 
@@ -136,7 +131,7 @@ export class Module<ConfigSchema extends IZod> {
  *  - priority is of the request determines the order of execution
  *     of all requests made to the executing module
  */
-export class Request {
+export class Request implements Observable {
   constructor(
     props: IRequest,
     module: Module<any>,
@@ -147,7 +142,6 @@ export class Request {
     this.value = props.value;
     this.optional = props.optional ?? false;
     this.priority = props.priority ?? 0;
-    this._status = 'uninitialised';
     this.messages = [];
     this.tasks = [];
 
@@ -155,8 +149,11 @@ export class Request {
     this.module = props.module ?? module;
     module.requests.push(this);
 
+    this.id = handler.makeId(`${this.module.id}:request`);
     this.handler.onEvent('register', this, props);
   }
+
+  public readonly id: string;
 
   public module: Module<any>;
 
@@ -188,7 +185,7 @@ export class Request {
   /**
    * Request status
    */
-  private _status: 'uninitialised' | 'initialised' | 'error' | 'disabled';
+  private _status: 'uninitialized' | 'queued' | 'completed' | 'error' | 'disabled' = 'uninitialized';
 
   public get status() {
     return this._status;
@@ -200,7 +197,7 @@ export class Request {
   }
 
   public addMessage(type: IMessage['type'], message: string, error?: Error) {
-    const msg = { type, message, error };
+    const msg = { type, message, error, status: this.status };
     this.messages.push(msg);
     this.handler.onEvent('message', this, msg);
     return msg;
@@ -223,7 +220,7 @@ export class Request {
  *  - runs after other executors of the same module in the order
  *     of their set priority
  */
-export class Executor {
+export class Executor implements Observable {
   constructor(
     props: IExecutor,
     public module: Module<any>,
@@ -238,8 +235,11 @@ export class Executor {
     this._init = props.init;
 
     this.module.executors.push(this);
+    this.id = handler.makeId(`${this.module.id}:executor`);
     this.handler.onEvent('register', this);
   }
+
+  public readonly id: string;
 
   // Human-readable description
   description?: string;
@@ -277,27 +277,31 @@ export class Executor {
     return this._exec;
   }
 
+  public status = 'registered' as const;
+
   private readonly _exec?: IExecutorParams;
 }
 
 /**
  * A work load made from a request and an executor
  */
-export class Task {
+export class Task implements Observable {
   constructor(
     params: ITask,
     private handler: IHandler,
     public executor: Executor,
     public request: Request,
   ) {
-    this._status = 'uninitialised';
     this.messages = [];
     this.priority = executor.priority + request.priority / 1000;
 
     // add to requester module for tracking purposes
     this.request.module.tasks.push(this);
+    this.id = handler.makeId(`${this.request.module.id}->${this.executor.id}->task`);
     this.handler.onEvent('register', this);
   }
+
+  public readonly id: string;
 
   async runInit(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>) {
     if (this.executor.init) {
@@ -305,11 +309,7 @@ export class Task {
         await this.executor.init(this, { ...actions, addMessage: this.addMessage });
       } catch (error: any) {
         this.status = 'error';
-        this.messages.push({
-          type: 'error',
-          message: 'Error while task init',
-          error,
-        });
+        this.addMessage('error', 'Error while task init', error);
         if (this.executor.exception === 'throw') {
           throw error;
         }
@@ -330,11 +330,7 @@ export class Task {
       }
     } catch (error: any) {
       this.status = 'error';
-      this.messages.push({
-        type: 'error',
-        message: 'Error while task exec',
-        error,
-      });
+      this.addMessage('error', 'Error while task exec', error);
       if (this.executor.exception === 'throw') {
         throw error;
       }
@@ -349,7 +345,7 @@ export class Task {
    *  - completed: exec completed successfully or nothing to do
    *  - error: error while init/exec
    */
-  private _status: 'disabled' | 'uninitialised' | 'queued' | 'completed' | 'error';
+  private _status: 'disabled' | 'uninitialized' | 'queued' | 'completed' | 'error' = 'uninitialized';
 
   public get status() {
     return this._status;
@@ -364,7 +360,7 @@ export class Task {
   messages: IMessage[];
 
   public addMessage(type: IMessage['type'], message: string, error?: Error) {
-    const msg = { type, message, error };
+    const msg = { type, message, error, status: this.status };
     this.messages.push(msg);
     this.handler.onEvent('message', this, msg);
     return msg;

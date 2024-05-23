@@ -2,9 +2,9 @@ import { Project } from 'ts-morph';
 
 import { loadConfig } from './scaffolding-config';
 import { Executor, Module, Request, Task } from './scaffolding.classes';
-import type { IEventHandler, IExecutor, IModule, IRequest, IZod } from './scaffolding.interfaces';
+import type { IEventHandler, IExecutor, IModule, IRequest, IZod, Observable } from './scaffolding.interfaces';
 
-export class ScaffoldingHandler {
+export class Handler implements Observable {
   // All modules
   public readonly modulesDict: Record<string, Module<any>> = {};
 
@@ -24,14 +24,15 @@ export class ScaffoldingHandler {
   public readonly tsMorphProject;
 
   private _status:
+    | 'registered'
     | 'uninitialized'
-    | 'configuring'
+    | 'loading-configs'
     | 'loading-executors'
     | 'loading-tasks'
-    | 'prepared'
     | 'executing'
-    | 'done'
-    | 'error' = 'uninitialized';
+    | 'completed'
+    | 'queued'
+    | 'executed' = 'uninitialized';
 
   constructor(
     public readonly cwd: string = process.cwd(),
@@ -39,6 +40,7 @@ export class ScaffoldingHandler {
   ) {
     this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
     this.rawConfig = loadConfig(this.cwd);
+    this.status = 'registered';
   }
 
   public register<ConfigSchema extends IZod>(module: IModule<ConfigSchema>) {
@@ -79,9 +81,13 @@ export class ScaffoldingHandler {
      */
     const executors = this.executors.filter((x) => x.match === request.match);
 
-    if (executors.length < 1 && !request.optional) {
-      request.status = 'error';
-      request.addMessage('error', `No executors found for request ${request.match}`);
+    if (executors.length < 1) {
+      if (!request.optional) {
+        request.status = 'error';
+        request.addMessage('error', `No executors found for request ${request.match}`);
+      } else {
+        request.status = 'disabled';
+      }
       return request;
     }
 
@@ -100,12 +106,12 @@ export class ScaffoldingHandler {
       }
     }
 
-    request.status = 'initialised';
+    request.status = 'queued';
 
     return request;
   }
 
-  private set status(value: ScaffoldingHandler['_status']) {
+  private set status(value: Handler['_status']) {
     this._status = value;
     this.onEvent('status', this, value);
   }
@@ -118,7 +124,7 @@ export class ScaffoldingHandler {
    * Initialize all modules
    */
   async init() {
-    this.status = 'configuring';
+    this.status = 'loading-configs';
 
     /**
      * Load config for all modules
@@ -174,15 +180,15 @@ export class ScaffoldingHandler {
       throw new Error('Request queue was not emptied');
     }
 
-    if (Object.values(this.modulesDict).some((m) => m.status === 'uninitialised')) {
-      throw new Error('Modules were not initialised');
+    if (Object.values(this.modulesDict).some((m) => m.status === 'uninitialized')) {
+      throw new Error('Modules were not initialized');
     }
 
-    if (Object.values(this.modulesDict).some((m) => m.requests.some((r) => r.status === 'uninitialised'))) {
-      throw new Error('Requests were not initialised');
+    if (Object.values(this.modulesDict).some((m) => m.requests.some((r) => r.status === 'uninitialized'))) {
+      throw new Error('Requests were not initialized');
     }
 
-    this.status = 'prepared';
+    this.status = this.tasks.length > 0 ? 'queued' : 'completed';
   }
 
   /**
@@ -190,6 +196,7 @@ export class ScaffoldingHandler {
    */
   async exec() {
     this.status = 'executing';
+
     // sort tasks by priority
     const queue = this.tasks.toSorted((a, b) => a.priority - b.priority);
 
@@ -207,7 +214,18 @@ export class ScaffoldingHandler {
 
     // apply typescript changes
     await this.tsMorphProject.save();
-    this.status = 'done';
+    this.status = 'executed';
+  }
+
+  ids: Record<string, number> = {};
+  public makeId(namespace: string) {
+    if (!this.ids[namespace]) {
+      this.ids[namespace] = 0;
+    }
+    return `${namespace}#${this.ids[namespace]++}`;
+  }
+  get id() {
+    return 'handler';
   }
 }
 

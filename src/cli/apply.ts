@@ -1,4 +1,4 @@
-import { ScaffoldingHandler, findScaffoldFiles } from '@povio/scaffold';
+import { Handler, findScaffoldFiles } from '@povio/scaffold';
 import { inspect } from 'util';
 import yargs from 'yargs';
 
@@ -30,7 +30,7 @@ export const command: yargs.CommandModule = {
       const cwd = args.cwd as string;
       const verbose = args.verbose as boolean;
 
-      const sh = new ScaffoldingHandler(cwd, scaffoldingLogger);
+      const sh = new Handler(cwd, scaffoldingLogger);
 
       for await (const module of findScaffoldFiles({ cwd })) {
         sh.register(module);

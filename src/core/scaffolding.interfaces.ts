@@ -1,14 +1,14 @@
 import type { Project } from 'ts-morph';
 import type { z } from 'zod';
 
-import { ScaffoldingHandler } from './scaffolding-handler';
-import { type Executor, type Module, type Request, Task } from './scaffolding.classes';
+import { Handler } from './scaffolding-handler';
+import type { Executor, Module, Request, Task } from './scaffolding.classes';
 
 type Optional<T, K extends keyof T> = Partial<Pick<T, K>> & Omit<T, K>;
 
 export type IZod = z.ZodObject<any, any, any>;
 
-export type IRequest = Partial<Omit<Request, 'tasks' | 'status'>> & { match: string };
+export type IRequest = Partial<Omit<Request, 'tasks' | 'status' | 'id'>> & { match: string };
 
 export type IMessageAdd = (type: IMessage['type'], message: string, error?: Error) => IMessage;
 
@@ -22,13 +22,15 @@ export type IExecutorParams = (
 
 export type IExecutor = Omit<
   Optional<Executor, 'priority' | 'exception'>,
-  'module' | 'runExec' | 'runInit' | 'init' | 'exec'
+  'module' | 'runExec' | 'runInit' | 'init' | 'exec' | 'status' | 'id'
 > & {
   init?: IExecutorParams;
   exec?: IExecutorParams;
 };
 
-export type ITask = Partial<Omit<Task, 'executor' | 'request' | 'status' | 'runExec' | 'runInit' | 'addMessage'>>;
+export type ITask = Partial<
+  Omit<Task, 'executor' | 'request' | 'status' | 'runExec' | 'runInit' | 'addMessage' | 'id'>
+>;
 
 export type IModuleInit<ConfigSchema extends IZod> = (
   context: {
@@ -51,7 +53,7 @@ export type IModuleInit<ConfigSchema extends IZod> = (
  * Container for executors and requests
  */
 export type IModule<ConfigSchema extends IZod> = Omit<
-  Optional<Module<ConfigSchema>, 'messages' | 'config' | 'status' | 'version'>,
+  Optional<Module<ConfigSchema>, 'messages' | 'config' | 'status' | 'version' | 'id'>,
   'requests' | 'executors' | 'tasks' | 'type' | 'runInit' | 'initConfig' | 'addMessage'
 > & {
   init?: IModuleInit<ConfigSchema>;
@@ -64,12 +66,28 @@ export interface IMessage {
   type: 'error' | 'warning' | 'info';
   message: string;
   error?: Error;
+  status?: IStatusTypes;
 }
 
+export type IStatusTypes =
+  | 'registered'
+  | 'configured'
+  | 'executed'
+  | 'uninitialized'
+  | 'queued'
+  | 'completed'
+  | 'error'
+  | 'disabled';
+
 export type IEventHandler = (
-  event: 'register' | 'init' | 'configure' | 'status' | 'message',
-  source: Module<any> | Request | Executor | Task | IHandler,
+  event: IStatusTypes | string,
+  source: Module<any> | Request | Executor | Task | Handler,
   data?: any,
 ) => void;
 
-export interface IHandler extends ScaffoldingHandler {}
+export interface IHandler extends Handler {}
+
+export abstract class Observable {
+  public abstract status: IStatusTypes | string;
+  public abstract readonly id: string;
+}

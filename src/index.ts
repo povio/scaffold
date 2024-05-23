@@ -6,7 +6,8 @@ export type {
   ITask,
   IMessage,
   IEventHandler,
+  IHandler,
 } from './core/scaffolding.interfaces';
 
-export { ScaffoldingHandler, createScaffolding } from './core/scaffolding-handler';
+export { Handler, createScaffolding } from './core/scaffolding-handler';
 export { findScaffoldFiles } from './core/scaffolding-finder';
