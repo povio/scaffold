@@ -9,14 +9,14 @@ declare class Module<ConfigSchema extends IZod> implements Observable {
     readonly version: string;
     readonly description?: string;
     private _status;
-    get status(): Module<ConfigSchema>['_status'];
-    set status(status: Module<ConfigSchema>['_status']);
+    get status(): IStatus;
+    set status(status: IStatus);
     messages: IMessage[];
     addMessage(type: IMessage['type'], message: string, error?: Error): {
         type: "error" | "warning" | "info";
         message: string;
         error: Error | undefined;
-        status: Status;
+        status: IStatus;
     };
     private readonly _requests;
     private readonly _executors;
@@ -35,19 +35,21 @@ declare class Request implements Observable {
     constructor(props: IRequest, module: Module<any>, handler: IHandler);
     readonly id: string;
     module: Module<any>;
-    description?: string;
+    _description?: string;
+    get description(): string;
+    set description(description: string);
     match: string;
     value?: Record<string, any>;
     optional?: boolean;
     priority: number;
     private _status;
-    get status(): Request['_status'];
-    set status(status: Request['_status']);
+    get status(): IStatus;
+    set status(status: IStatus);
     addMessage(type: IMessage['type'], message: string, error?: Error): {
         type: "error" | "warning" | "info";
         message: string;
         error: Error | undefined;
-        status: Status;
+        status: IStatus;
     };
     messages: IMessage[];
     tasks: Task[];
@@ -64,7 +66,7 @@ declare class Executor implements Observable {
     private readonly _init?;
     exception: 'ignore' | 'throw';
     get exec(): IExecutorParams | undefined;
-    status: Status.registered;
+    readonly status: IStatus;
     private readonly _exec?;
 }
 declare class Task implements Observable {
@@ -77,14 +79,14 @@ declare class Task implements Observable {
     runInit(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>): Promise<void>;
     runExec(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>): Promise<void>;
     private _status;
-    get status(): Task['_status'];
-    set status(status: Task['_status']);
+    get status(): IStatus;
+    set status(status: IStatus);
     messages: IMessage[];
     addMessage(type: IMessage['type'], message: string, error?: Error): {
         type: "error" | "warning" | "info";
         message: string;
         error: Error | undefined;
-        status: Status;
+        status: IStatus;
     };
     priority: number;
     data?: Record<string, any>;
@@ -108,7 +110,7 @@ declare class Handler implements Observable {
     registerExecutor(_executor: IExecutor, module: Module<any>): Promise<Executor>;
     initTasks(request: Request): Promise<Request>;
     private set status(value);
-    get status(): Handler['_status'];
+    get status(): IStatus;
     init(): Promise<void>;
     exec(): Promise<void>;
     ids: Record<string, number>;
@@ -141,7 +143,7 @@ type IModuleInit<ConfigSchema extends IZod> = (context: {
 }, actions: {
     addRequest: (request: IRequest) => Promise<IRequest>;
     addExecutor: (executor: IExecutor) => Promise<IExecutor>;
-    setStatus: (status: Module<any>['status']) => void;
+    setStatus: (status: IStatus) => void;
     addMessage: IMessageAdd;
 }) => Promise<void>;
 type IModule<ConfigSchema extends IZod> = Omit<Optional<Module<ConfigSchema>, 'messages' | 'config' | 'status' | 'version' | 'id' | 'exception'>, 'requests' | 'executors' | 'tasks' | 'type' | 'runInit' | 'initConfig' | 'addMessage'> & {
@@ -154,7 +156,7 @@ interface IMessage {
     type: 'error' | 'warning' | 'info';
     message: string;
     error?: Error;
-    status?: Status;
+    status?: IStatus;
 }
 declare enum Status {
     registered = "registered",
@@ -167,11 +169,12 @@ declare enum Status {
     executed = "executed",
     errored = "errored"
 }
-type IEventHandler = (event: Status | 'message' | 'status', source: Module<any> | Request | Executor | Task | Handler, data?: any) => void;
+type IStatus = keyof typeof Status | Status;
+type IEventHandler = (event: IStatus | 'message', source: Module<any> | Request | Executor | Task | Handler, data?: any) => void;
 interface IHandler extends Handler {
 }
 declare abstract class Observable {
-    abstract status: Status | string;
+    abstract status: IStatus | string;
     abstract readonly id: string;
     abstract readonly description?: string;
 }
@@ -180,4 +183,4 @@ declare function findScaffoldFiles<SM extends IModule<any>>(context: {
     cwd: string;
 }): AsyncGenerator<SM>;
 
-export { Handler, type IEventHandler, type IExecutor, type IHandler, type IMessage, type IModule, type IModuleInit, type IRequest, type ITask, Status, createScaffolding, findScaffoldFiles };
+export { Handler, type IEventHandler, type IExecutor, type IHandler, type IMessage, type IModule, type IModuleInit, type IRequest, type IStatus, type ITask, createScaffolding, findScaffoldFiles };

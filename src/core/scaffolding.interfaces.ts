@@ -44,7 +44,7 @@ export type IModuleInit<ConfigSchema extends IZod> = (
   actions: {
     addRequest: (request: IRequest) => Promise<IRequest>;
     addExecutor: (executor: IExecutor) => Promise<IExecutor>;
-    setStatus: (status: Module<any>['status']) => void;
+    setStatus: (status: IStatus) => void;
     addMessage: IMessageAdd;
   },
 ) => Promise<void>;
@@ -66,7 +66,8 @@ export interface IMessage {
   type: 'error' | 'warning' | 'info';
   message: string;
   error?: Error;
-  status?: Status;
+  // Current status of the calling source
+  status?: IStatus;
 }
 
 export enum Status {
@@ -93,8 +94,10 @@ export enum Status {
   errored = 'errored',
 }
 
+export type IStatus = keyof typeof Status | Status;
+
 export type IEventHandler = (
-  event: Status | 'message' | 'status',
+  event: IStatus | 'message',
   source: Module<any> | Request | Executor | Task | Handler,
   data?: any,
 ) => void;
@@ -102,7 +105,7 @@ export type IEventHandler = (
 export interface IHandler extends Handler {}
 
 export abstract class Observable {
-  public abstract status: Status | string;
+  public abstract status: IStatus | string;
   public abstract readonly id: string;
   public abstract readonly description?: string;
 }

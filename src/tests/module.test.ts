@@ -54,7 +54,7 @@ an_object:
     return files[name] as any;
   }
 
-  const sh = new Handler(undefined, scaffoldingLogger({ verbose: false }));
+  const sh = new Handler(undefined, scaffoldingLogger({ verbose: false, debug: false }));
 
   const sc1: IModule<any> = {
     name: 'an-config-module',

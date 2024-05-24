@@ -1,13 +1,6 @@
-import type { IExecutor, IMessage, IModule, IModuleInit } from './scaffolding.interfaces';
-import {
-  type IExecutorParams,
-  type IHandler,
-  type IRequest,
-  type ITask,
-  type IZod,
-  type Observable,
-  Status,
-} from './scaffolding.interfaces';
+import type { IExecutor, IMessage, IModule, IModuleInit, IStatus } from './scaffolding.interfaces';
+import { IExecutorParams, IHandler, IRequest, ITask, IZod, Observable } from './scaffolding.interfaces';
+import { Status } from './scaffolding.interfaces';
 
 export class Module<ConfigSchema extends IZod> implements Observable {
   constructor(
@@ -42,16 +35,16 @@ export class Module<ConfigSchema extends IZod> implements Observable {
   // Human-readable description of the module
   public readonly description?: string;
 
-  private _status: Status = Status.uninitialized;
+  private _status: IStatus = Status.uninitialized;
 
   public get status() {
     return this._status;
   }
 
-  public set status(status: Module<ConfigSchema>['_status']) {
+  public set status(status: IStatus) {
     if (this._status !== status) {
       this._status = status;
-      this.handler.onEvent('status', this, status);
+      this.handler.onEvent(status, this);
     }
   }
 
@@ -109,7 +102,7 @@ export class Module<ConfigSchema extends IZod> implements Observable {
     const plugins: Parameters<IModuleInit<ConfigSchema>>[1] = {
       ..._plugins,
       addMessage: (...args) => this.addMessage(...args),
-      setStatus: (status: Module<any>['_status']) => {
+      setStatus: (status: IStatus) => {
         this.status = status;
       },
     };
@@ -154,7 +147,7 @@ export class Request implements Observable {
     module: Module<any>,
     private handler: IHandler,
   ) {
-    this.description = props.description;
+    this._description = props.description;
     this.match = props.match;
     this.value = props.value;
     this.optional = props.optional ?? false;
@@ -184,7 +177,15 @@ export class Request implements Observable {
   public module: Module<any>;
 
   // Description for the request
-  description?: string;
+  _description?: string;
+
+  public get description() {
+    return this._description || this.match;
+  }
+
+  public set description(description: string) {
+    this._description = description;
+  }
 
   /**
    * Matching string used to find the executor
@@ -211,16 +212,16 @@ export class Request implements Observable {
   /**
    * Request status
    */
-  private _status: Status = Status.uninitialized;
+  private _status: IStatus = Status.uninitialized;
 
   public get status() {
     return this._status;
   }
 
-  public set status(status: Request['_status']) {
+  public set status(status: IStatus) {
     if (this._status !== status) {
       this._status = status;
-      this.handler.onEvent('status', this, status);
+      this.handler.onEvent(status, this);
     }
   }
 
@@ -308,7 +309,7 @@ export class Executor implements Observable {
   /**
    * Executors do not have a lifecycle, see Tasks
    */
-  public status: Status.registered = Status.registered;
+  public readonly status: IStatus = Status.registered;
 
   private readonly _exec?: IExecutorParams;
 }
@@ -368,12 +369,14 @@ export class Task implements Observable {
           throw error;
         }
       }
+    } else {
+      this.status = this.executor.exec ? Status.queued : Status.conforming;
     }
   }
 
   async runExec(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>) {
     if (!this.executor.exec) {
-      throw new Error('No exec function defined');
+      throw new Error(`No exec function defined for ${this.executor.id}`);
     }
     try {
       await this.executor.exec(this, { ...actions, addMessage: (...args) => this.addMessage(...args) });
@@ -398,16 +401,19 @@ export class Task implements Observable {
    *  - completed: exec completed successfully or nothing to do
    *  - error: error while init/exec
    */
-  private _status: Status = Status.uninitialized;
+  private _status: IStatus = Status.uninitialized;
 
   public get status() {
     return this._status;
   }
 
-  public set status(status: Task['_status']) {
+  public set status(status: IStatus) {
+    // @ts-expect-error - backwards compatibility
+    if (status === 'completed') status = Status.conforming;
+
     if (this._status !== status) {
       this._status = status;
-      this.handler.onEvent('status', this, status);
+      this.handler.onEvent(status, this);
     }
   }
 

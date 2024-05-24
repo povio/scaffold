@@ -2,15 +2,8 @@ import { Project } from 'ts-morph';
 
 import { loadConfig } from './scaffolding-config';
 import { Executor, Module, Request, Task } from './scaffolding.classes';
-import {
-  type IEventHandler,
-  type IExecutor,
-  type IModule,
-  type IRequest,
-  type IZod,
-  type Observable,
-  Status,
-} from './scaffolding.interfaces';
+import type { IEventHandler, IExecutor, IModule, IRequest, IZod, Observable, IStatus } from './scaffolding.interfaces';
+import { Status } from './scaffolding.interfaces';
 
 export class Handler implements Observable {
   // All modules
@@ -40,7 +33,7 @@ export class Handler implements Observable {
     | 'conforming'
     | 'executing'
     | 'executed' = 'initializing';
-  private _status: Status = Status.uninitialized;
+  private _status: IStatus = Status.uninitialized;
 
   public description = 'Scaffolding Handler';
 
@@ -118,17 +111,17 @@ export class Handler implements Observable {
       request.tasks.push(task);
     }
 
-    request.status = request.tasks.some((x) => [Status.queued, Status.delegated].includes(x.status))
+    request.status = request.tasks.some((x) => ([Status.queued, Status.delegated] as IStatus[]).includes(x.status))
       ? Status.queued
       : Status.disabled;
 
     return request;
   }
 
-  private set status(status: Handler['_status']) {
+  private set status(status: IStatus) {
     if (this._status !== status) {
       this._status = status;
-      this.onEvent('status', this, status);
+      this.onEvent(status, this);
     }
   }
 
@@ -175,7 +168,9 @@ export class Handler implements Observable {
     )) {
       await this.registerRequest(
         {
-          description: `run ${executor.match.endsWith(':#before-all') ? 'before' : 'after'} for ${executor.module.name}`,
+          description:
+            executor.description ||
+            `run ${executor.match.endsWith(':#before-all') ? 'before' : 'after'} for ${executor.module.name}`,
           match: executor.match,
         },
         executor.module,
