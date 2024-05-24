@@ -53,7 +53,7 @@ export type IModuleInit<ConfigSchema extends IZod> = (
  * Container for executors and requests
  */
 export type IModule<ConfigSchema extends IZod> = Omit<
-  Optional<Module<ConfigSchema>, 'messages' | 'config' | 'status' | 'version' | 'id'>,
+  Optional<Module<ConfigSchema>, 'messages' | 'config' | 'status' | 'version' | 'id' | 'exception'>,
   'requests' | 'executors' | 'tasks' | 'type' | 'runInit' | 'initConfig' | 'addMessage'
 > & {
   init?: IModuleInit<ConfigSchema>;
@@ -66,21 +66,35 @@ export interface IMessage {
   type: 'error' | 'warning' | 'info';
   message: string;
   error?: Error;
-  status?: IStatusTypes;
+  status?: Status;
 }
 
-export type IStatusTypes =
-  | 'registered'
-  | 'configured'
-  | 'executed'
-  | 'uninitialized'
-  | 'queued'
-  | 'completed'
-  | 'error'
-  | 'disabled';
+export enum Status {
+  registered = 'registered',
+  configured = 'configured',
+
+  // waiting for initialization
+  uninitialized = 'uninitialized',
+
+  // Waiting to execute
+  queued = 'queued',
+  // Passed to another executor
+  delegated = 'delegated',
+
+  // Programmatically Skipped - no actions
+  disabled = 'disabled',
+  // Existing state is sufficient - no actions
+  conforming = 'conforming',
+
+  // All tasks are completed
+  executed = 'executed',
+
+  // Error occurred in the pipeline
+  errored = 'errored',
+}
 
 export type IEventHandler = (
-  event: IStatusTypes | string,
+  event: Status | 'message' | 'status',
   source: Module<any> | Request | Executor | Task | Handler,
   data?: any,
 ) => void;
@@ -88,6 +102,7 @@ export type IEventHandler = (
 export interface IHandler extends Handler {}
 
 export abstract class Observable {
-  public abstract status: IStatusTypes | string;
+  public abstract status: Status | string;
   public abstract readonly id: string;
+  public abstract readonly description?: string;
 }

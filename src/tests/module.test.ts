@@ -1,9 +1,9 @@
 import { test } from 'node:test';
-import { parseDocument, isCollection, type Document } from 'yaml';
+import { parseDocument, type Document } from 'yaml';
 
 import { Handler } from '../core/scaffolding-handler';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
-import { IModule } from '../core/scaffolding.interfaces';
+import { IModule, Status } from '../core/scaffolding.interfaces';
 
 test('yarn scaffold', async () => {
   const files: Record<
@@ -45,7 +45,7 @@ an_object:
       files[name] = { save: false, content: '' };
     }
     if (!files[name].yaml) {
-      files[name].yaml = parseDocument(files[name].content || '', {
+      files[name].yaml = parseDocument(files[name].content || 'dummy: content', {
         prettyErrors: true,
         merge: true,
         keepSourceTokens: true,
@@ -54,22 +54,22 @@ an_object:
     return files[name] as any;
   }
 
-  const sh = new Handler(undefined, scaffoldingLogger);
+  const sh = new Handler(undefined, scaffoldingLogger({ verbose: false }));
 
   const sc1: IModule<any> = {
     name: 'an-config-module',
-    init: async (_, { addExecutor, addRequest, addMessage }) => {
+    init: async (_, { addExecutor, addRequest }) => {
       await addExecutor({
         match: 'an-config-module',
         description: 'prepare dot-config file changes',
         priority: 50,
-        init: async (task) => {
+        init: async (task, { addMessage }) => {
           if (!task.request.value) {
             throw new Error('value is required');
           }
           const { state, stage, value: _value } = task.request.value;
           if (!stage || !state || !_value) {
-            task.status = 'error';
+            task.status = Status.errored;
             addMessage('error', `stage, value, and state are required for dot-config creation`);
             return;
           }
@@ -82,54 +82,30 @@ an_object:
             for (const s of [...stages.keys()]) {
               await addRequest({
                 match: 'an-config-module',
-                description: `propagating ${stage} to ${s} dot-config`,
+                description: task.request.description,
                 value: { ...task.request.value, stage: s },
                 module: task.request.module, // override module
               });
             }
-            task.status = 'completed';
-            addMessage('info', `queued ${stage} dot-config for all stages`);
+            task.status = Status.conforming;
+            // addMessage('info', `queued ${stage} dot-config for all stages`);
             return;
           }
           const file = get(`${stage}.app.template.yml`);
-          const message = [];
           switch (state) {
             case 'created': {
               for (const [k, v] of Object.entries(value)) {
-                if (!file.yaml?.has(k)) {
-                  file.yaml.addIn([k], v);
+                if (!file.yaml.hasIn(k.split('.'))) {
+                  file.yaml.addIn(k.split('.'), v);
                   file.save = true;
-                  message.push(`create ${k} section`);
+                  addMessage('info', `create "${k}" section in "${stage}"`);
+                  task.status = Status.delegated;
                 }
               }
               break;
             }
-            case 'subset': {
-              // this is a really dumb implementation
-              //  we should be able to set a subset of the yaml recursively
-              for (const [section, sectionValue] of Object.entries(value)) {
-                if (!file.yaml.has(section)) {
-                  file.yaml.set(section, sectionValue);
-                  file.save = true;
-                  message.push(`create ${section} section`);
-                } else {
-                  const sectionNode = file.yaml.get(section);
-                  if (!isCollection(sectionNode)) {
-                    task.status = 'error';
-                    addMessage('error', `expected section ${section} to be a collection`);
-                    return;
-                  }
-                  for (const [sectionItem, v] of Object.entries(sectionValue)) {
-                    if (!sectionNode.has(sectionItem) || sectionNode.get(sectionItem) !== v) {
-                      sectionNode.setIn([sectionItem], v);
-                      file.save = true;
-                      message.push(`update ${section}.${sectionItem} to ${v}`);
-                    }
-                  }
-                }
-              }
-              break;
-            }
+            default:
+              throw new Error(`unsupported state: ${state}`);
           }
           return;
         },
@@ -138,15 +114,19 @@ an_object:
       await addExecutor({
         match: 'an-config-module:#after-all',
         description: 'save dot-config files',
-        init: async (task) => {
+        init: async (task, { addMessage }) => {
           // check if we need to update the files
           if (!Object.values(files).some((f) => f.save)) {
-            task.status = 'disabled';
+            task.status = Status.disabled;
+            addMessage('info', 'no changes to save');
           }
+          addMessage('info', 'saving changes');
+          // task.status = Status.queued;
         },
-        exec: async () => {
+        exec: async (task, { addMessage }) => {
           // update the files
           addMessage('info', 'updating dot-config files');
+          // throw new Error('not implemented');
         },
       });
     },
@@ -158,10 +138,10 @@ an_object:
     name: 'need-stuff-done',
     requests: [
       {
-        description: 'create an_object section or just add key3',
+        description: 'make sure an_object.key3 is present',
         priority: 15, // higher priority to capture the [all] stage
         match: 'an-config-module',
-        value: { state: 'subset', stage: '[all]', value: { an_object: { key3: 'value3' } } },
+        value: { state: 'created', stage: '[all]', value: { 'an_object.key3': 'value3' } },
       },
     ],
   });
@@ -171,8 +151,9 @@ an_object:
     requests: [
       {
         priority: 10,
+        description: 'create a new stage with another_object',
         match: 'an-config-module',
-        value: { state: 'subset', stage: 'myapp-prd', value: { another_object: { keyB: 'valueC' } } },
+        value: { state: 'created', stage: 'myapp-prd', value: { another_object: { keyB: 'valueC' } } },
       },
     ],
   });

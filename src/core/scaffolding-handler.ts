@@ -2,7 +2,15 @@ import { Project } from 'ts-morph';
 
 import { loadConfig } from './scaffolding-config';
 import { Executor, Module, Request, Task } from './scaffolding.classes';
-import type { IEventHandler, IExecutor, IModule, IRequest, IZod, Observable } from './scaffolding.interfaces';
+import {
+  type IEventHandler,
+  type IExecutor,
+  type IModule,
+  type IRequest,
+  type IZod,
+  type Observable,
+  Status,
+} from './scaffolding.interfaces';
 
 export class Handler implements Observable {
   // All modules
@@ -23,16 +31,18 @@ export class Handler implements Observable {
   // TsMorph Project of the current codebase
   public readonly tsMorphProject;
 
-  private _status:
-    | 'registered'
-    | 'uninitialized'
+  private step:
+    | 'initializing'
     | 'loading-configs'
     | 'loading-executors'
     | 'loading-tasks'
-    | 'executing'
-    | 'completed'
     | 'queued'
-    | 'executed' = 'uninitialized';
+    | 'conforming'
+    | 'executing'
+    | 'executed' = 'initializing';
+  private _status: Status = Status.uninitialized;
+
+  public description = 'Scaffolding Handler';
 
   constructor(
     public readonly cwd: string = process.cwd(),
@@ -40,7 +50,7 @@ export class Handler implements Observable {
   ) {
     this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
     this.rawConfig = loadConfig(this.cwd);
-    this.status = 'registered';
+    this.status = Status.registered;
   }
 
   public register<ConfigSchema extends IZod>(module: IModule<ConfigSchema>) {
@@ -59,7 +69,7 @@ export class Handler implements Observable {
   }
 
   async registerExecutor(_executor: IExecutor, module: Module<any>) {
-    if (!['loading-executors'].includes(this.status)) {
+    if (!['loading-executors'].includes(this.step)) {
       throw new Error('Cannot add executor outside of module init');
     }
     const executor = new Executor(_executor, module, this);
@@ -68,7 +78,7 @@ export class Handler implements Observable {
   }
 
   async initTasks(request: Request): Promise<Request> {
-    if (!['loading-tasks'].includes(this.status)) {
+    if (!['loading-tasks'].includes(this.step)) {
       throw new Error('Cannot init request outside of task loading step');
     }
 
@@ -83,10 +93,10 @@ export class Handler implements Observable {
 
     if (executors.length < 1) {
       if (!request.optional) {
-        request.status = 'error';
+        request.status = Status.errored;
         request.addMessage('error', `No executors found for request ${request.match}`);
       } else {
-        request.status = 'disabled';
+        request.status = Status.disabled;
       }
       return request;
     }
@@ -100,20 +110,26 @@ export class Handler implements Observable {
         },
       });
 
-      if (task.status === 'queued') {
+      if (task.status === Status.queued) {
         // add to global tasks for execution
         this.tasks.push(task);
       }
+      // add to requester
+      request.tasks.push(task);
     }
 
-    request.status = 'queued';
+    request.status = request.tasks.some((x) => [Status.queued, Status.delegated].includes(x.status))
+      ? Status.queued
+      : Status.disabled;
 
     return request;
   }
 
-  private set status(value: Handler['_status']) {
-    this._status = value;
-    this.onEvent('status', this, value);
+  private set status(status: Handler['_status']) {
+    if (this._status !== status) {
+      this._status = status;
+      this.onEvent('status', this, status);
+    }
   }
 
   public get status() {
@@ -124,7 +140,7 @@ export class Handler implements Observable {
    * Initialize all modules
    */
   async init() {
-    this.status = 'loading-configs';
+    this.step = 'loading-configs';
 
     /**
      * Load config for all modules
@@ -136,7 +152,7 @@ export class Handler implements Observable {
     /**
      * Find all executors
      */
-    this.status = 'loading-executors';
+    this.step = 'loading-executors';
     for (const module of Object.values(this.modulesDict)) {
       await module.runInit(
         {
@@ -166,7 +182,7 @@ export class Handler implements Observable {
       );
     }
 
-    this.status = 'loading-tasks';
+    this.step = 'loading-tasks';
 
     /**
      * Init all tasks
@@ -176,26 +192,28 @@ export class Handler implements Observable {
       await this.initTasks(this.requestQueue.shift()!);
     }
 
+    /**
+     * Smoke tests
+     */
     if (this.requestQueue.length > 0) {
       throw new Error('Request queue was not emptied');
     }
-
-    if (Object.values(this.modulesDict).some((m) => m.status === 'uninitialized')) {
+    if (Object.values(this.modulesDict).some((m) => m.status === Status.uninitialized)) {
       throw new Error('Modules were not initialized');
     }
-
-    if (Object.values(this.modulesDict).some((m) => m.requests.some((r) => r.status === 'uninitialized'))) {
+    if (Object.values(this.modulesDict).some((m) => m.requests.some((r) => r.status === Status.uninitialized))) {
       throw new Error('Requests were not initialized');
     }
 
-    this.status = this.tasks.length > 0 ? 'queued' : 'completed';
+    this.step = this.tasks.length > 0 ? 'queued' : 'conforming';
+    this.status = this.tasks.length > 0 ? Status.queued : Status.conforming;
   }
 
   /**
    * Execute all tasks
    */
   async exec() {
-    this.status = 'executing';
+    this.step = 'executing';
 
     // sort tasks by priority
     const queue = this.tasks.toSorted((a, b) => a.priority - b.priority);
@@ -205,7 +223,7 @@ export class Handler implements Observable {
       if (task?.status !== 'queued') {
         throw new Error('Task is not queued');
       }
-      task.runExec({
+      await task.runExec({
         withTsMorph: async (func: (context: { project: Project }) => Promise<void>) => {
           await func({ project: this.tsMorphProject });
         },
@@ -214,7 +232,8 @@ export class Handler implements Observable {
 
     // apply typescript changes
     await this.tsMorphProject.save();
-    this.status = 'executed';
+    this.step = 'executed';
+    this.status = Status.executed;
   }
 
   ids: Record<string, number> = {};

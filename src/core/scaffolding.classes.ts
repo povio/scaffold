@@ -1,5 +1,13 @@
-import type { IExecutorParams, IHandler, IRequest, ITask, IZod, Observable } from './scaffolding.interfaces';
 import type { IExecutor, IMessage, IModule, IModuleInit } from './scaffolding.interfaces';
+import {
+  type IExecutorParams,
+  type IHandler,
+  type IRequest,
+  type ITask,
+  type IZod,
+  type Observable,
+  Status,
+} from './scaffolding.interfaces';
 
 export class Module<ConfigSchema extends IZod> implements Observable {
   constructor(
@@ -18,8 +26,9 @@ export class Module<ConfigSchema extends IZod> implements Observable {
     this._executors = props.executors ?? [];
     this.requests = [];
     this.executors = [];
+    this.exception = props.exception ?? 'ignore';
 
-    this.handler.onEvent('register', this, props);
+    this.handler.onEvent(Status.registered, this, props);
   }
 
   get id() {
@@ -33,15 +42,17 @@ export class Module<ConfigSchema extends IZod> implements Observable {
   // Human-readable description of the module
   public readonly description?: string;
 
-  private _status: 'uninitialized' | 'error' | 'disabled' | 'queued' = 'uninitialized';
+  private _status: Status = Status.uninitialized;
 
   public get status() {
     return this._status;
   }
 
   public set status(status: Module<ConfigSchema>['_status']) {
-    this._status = status;
-    this.handler.onEvent('status', this, status);
+    if (this._status !== status) {
+      this._status = status;
+      this.handler.onEvent('status', this, status);
+    }
   }
 
   messages: IMessage[];
@@ -79,7 +90,7 @@ export class Module<ConfigSchema extends IZod> implements Observable {
         throw new Error(`Invalid config for ${this.name}: ${error}`);
       }
       this.config = data;
-      this.handler.onEvent('configure', this, config);
+      this.handler.onEvent(Status.configured, this, config);
     }
   }
 
@@ -112,16 +123,22 @@ export class Module<ConfigSchema extends IZod> implements Observable {
       if (this._init) {
         await this._init(config, plugins);
       }
+      if (this.status === Status.uninitialized) {
+        this.status = this.requests.length < 1 && this.executors.length < 1 ? Status.disabled : Status.queued;
+      }
     } catch (error: any) {
+      this.status = Status.errored;
       this.addMessage('error', 'Error while initializing module', error);
-      this.status = 'error';
-    }
-    if (this.status === 'uninitialized') {
-      this.status = this.requests.length < 1 && this.executors.length < 1 ? 'disabled' : 'queued';
+      if (this.exception === 'throw') {
+        throw error;
+      }
     }
   }
 
   private readonly _init?: IModuleInit<ConfigSchema>;
+
+  // Exception behaviour
+  exception: 'ignore' | 'throw';
 }
 
 /**
@@ -141,16 +158,25 @@ export class Request implements Observable {
     this.match = props.match;
     this.value = props.value;
     this.optional = props.optional ?? false;
-    this.priority = props.priority ?? 0;
     this.messages = [];
     this.tasks = [];
+
+    if (props.priority) {
+      this.priority = props.priority;
+    } else if (props.match.includes('#after-all')) {
+      this.priority = 100;
+    } else if (props.match.includes('#before-all')) {
+      this.priority = -100;
+    } else {
+      this.priority = 0;
+    }
 
     // override the module if provided
     this.module = props.module ?? module;
     module.requests.push(this);
 
     this.id = handler.makeId(`${this.module.id}:request`);
-    this.handler.onEvent('register', this, props);
+    this.handler.onEvent(Status.registered, this, props);
   }
 
   public readonly id: string;
@@ -185,15 +211,17 @@ export class Request implements Observable {
   /**
    * Request status
    */
-  private _status: 'uninitialized' | 'queued' | 'completed' | 'error' | 'disabled' = 'uninitialized';
+  private _status: Status = Status.uninitialized;
 
   public get status() {
     return this._status;
   }
 
   public set status(status: Request['_status']) {
-    this._status = status;
-    this.handler.onEvent('status', this, status);
+    if (this._status !== status) {
+      this._status = status;
+      this.handler.onEvent('status', this, status);
+    }
   }
 
   public addMessage(type: IMessage['type'], message: string, error?: Error) {
@@ -210,7 +238,7 @@ export class Request implements Observable {
    * Executors matched to the request
    *  - set by the ScaffoldingHandler after all modules have been initialized
    */
-  tasks: ITask[];
+  tasks: Task[];
 }
 
 /**
@@ -236,7 +264,7 @@ export class Executor implements Observable {
 
     this.module.executors.push(this);
     this.id = handler.makeId(`${this.module.id}:executor`);
-    this.handler.onEvent('register', this);
+    this.handler.onEvent(Status.registered, this);
   }
 
   public readonly id: string;
@@ -277,7 +305,10 @@ export class Executor implements Observable {
     return this._exec;
   }
 
-  public status = 'registered' as const;
+  /**
+   * Executors do not have a lifecycle, see Tasks
+   */
+  public status: Status.registered = Status.registered;
 
   private readonly _exec?: IExecutorParams;
 }
@@ -295,27 +326,49 @@ export class Task implements Observable {
     this.messages = [];
     this.priority = executor.priority + request.priority / 1000;
 
-    // add to requester module for tracking purposes
-    this.request.module.tasks.push(this);
-    this.id = handler.makeId(`${this.request.module.id}->${this.executor.id}->task`);
-    this.handler.onEvent('register', this);
+    /**
+     * Task id derived from the request module
+     */
+    this.id = handler.makeId(`${this.request.module.id}:task`);
+    this.handler.onEvent(Status.registered, this);
   }
 
   public readonly id: string;
 
+  public get description() {
+    switch (true) {
+      // best case the requester explains the task
+      case !!this.request.description:
+        return this.request.description;
+      // second best case the executor explains the task
+      case !!this.executor.description:
+        return this.executor.description;
+      // third best the executor module explains the task
+      case !!this.executor.module.description:
+        return `${this.executor.module.description}`;
+      // last resort, the executor match string
+      default:
+        return `match:${this.executor.match}`;
+    }
+  }
+
   async runInit(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>) {
     if (this.executor.init) {
       try {
-        await this.executor.init(this, { ...actions, addMessage: this.addMessage });
+        await this.executor.init(this, { ...actions, addMessage: (...args) => this.addMessage(...args) });
+        if (this.status === Status.uninitialized) {
+          // if there are no executors it will be marked as conformed as default
+          // executors should mark as disabled/delegated themselves
+          this.status = this.executor.exec ? Status.queued : Status.conforming;
+        }
       } catch (error: any) {
-        this.status = 'error';
+        this.status = Status.errored;
         this.addMessage('error', 'Error while task init', error);
         if (this.executor.exception === 'throw') {
           throw error;
         }
       }
     }
-    this.status = this.executor.exec ? 'queued' : 'completed';
   }
 
   async runExec(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>) {
@@ -323,13 +376,13 @@ export class Task implements Observable {
       throw new Error('No exec function defined');
     }
     try {
-      await this.executor.exec(this, { ...actions, addMessage: this.addMessage });
-
-      if (this.status === 'queued') {
-        this.status = 'completed';
+      await this.executor.exec(this, { ...actions, addMessage: (...args) => this.addMessage(...args) });
+      if (this.status === Status.queued) {
+        // task did not change status, mark as completed
+        this.status = Status.executed;
       }
     } catch (error: any) {
-      this.status = 'error';
+      this.status = Status.errored;
       this.addMessage('error', 'Error while task exec', error);
       if (this.executor.exception === 'throw') {
         throw error;
@@ -345,15 +398,17 @@ export class Task implements Observable {
    *  - completed: exec completed successfully or nothing to do
    *  - error: error while init/exec
    */
-  private _status: 'disabled' | 'uninitialized' | 'queued' | 'completed' | 'error' = 'uninitialized';
+  private _status: Status = Status.uninitialized;
 
   public get status() {
     return this._status;
   }
 
   public set status(status: Task['_status']) {
-    this._status = status;
-    this.handler.onEvent('status', this, status);
+    if (this._status !== status) {
+      this._status = status;
+      this.handler.onEvent('status', this, status);
+    }
   }
 
   // Human-readable status message

@@ -1,8 +1,17 @@
-import { Handler, findScaffoldFiles } from '@povio/scaffold';
-import { inspect } from 'util';
+import { Handler, findScaffoldFiles, Status } from '@povio/scaffold';
 import yargs from 'yargs';
 
 import { scaffoldingLogger } from '../core/scaffolding-logger';
+
+const keypress = async () => {
+  process.stdin.setRawMode(true);
+  return new Promise<void>((resolve) =>
+    process.stdin.once('data', () => {
+      process.stdin.setRawMode(false);
+      resolve();
+    }),
+  );
+};
 
 export const command: yargs.CommandModule = {
   command: 'apply',
@@ -30,7 +39,7 @@ export const command: yargs.CommandModule = {
       const cwd = args.cwd as string;
       const verbose = args.verbose as boolean;
 
-      const sh = new Handler(cwd, scaffoldingLogger);
+      const sh = new Handler(cwd, scaffoldingLogger({ verbose }));
 
       for await (const module of findScaffoldFiles({ cwd })) {
         sh.register(module);
@@ -39,13 +48,12 @@ export const command: yargs.CommandModule = {
       // load all modules
       await sh.init();
 
-      if (sh.status !== 'error') {
-        // execute all modules in order
-        // todo, ask for confirmation
+      if (sh.status === Status.queued) {
+        console.log(`Press any key to execute ${sh.tasks.filter((x) => x.status === Status.queued)} tasks:`);
+        await keypress();
         await sh.exec();
       } else {
-        // eslint-disable-next-line no-console
-        console.error('Error during init');
+        console.log('No tasks to execute');
       }
     } catch (error) {
       // eslint-disable-next-line no-console
