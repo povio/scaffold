@@ -76,6 +76,8 @@ declare class Task implements Observable {
     constructor(params: ITask, handler: IHandler, executor: Executor, request: Request);
     readonly id: string;
     get description(): string;
+    set description(description: string);
+    private _description?;
     runInit(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>): Promise<void>;
     runExec(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>): Promise<void>;
     private _status;

@@ -338,6 +338,8 @@ export class Task implements Observable {
 
   public get description() {
     switch (true) {
+      case !!this._description:
+        return this._description;
       // best case the requester explains the task
       case !!this.request.description:
         return this.request.description;
@@ -352,6 +354,11 @@ export class Task implements Observable {
         return `match:${this.executor.match}`;
     }
   }
+
+  public set description(description: string) {
+    this._description = description;
+  }
+  private _description?: string;
 
   async runInit(actions: Omit<Parameters<IExecutorParams>[1], 'addMessage'>) {
     if (this.executor.init) {
