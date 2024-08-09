@@ -1,21 +1,24 @@
 {
   "name": "@povio/scaffold",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "author": "Marko Zabreznik <marko.zabreznik@povio.com> (https://zabreznik.net)",
+  "license": "BSD-3-Clause",
   "scripts": {
     "build": "tsup",
     "cli": "DEBUG_COLORS=1 DEBUG='scaffold:*' node -r @swc-node/register src/cli.ts",
     "test": "DEBUG_COLORS=1 DEBUG='scaffold:*' node --test -r @swc-node/register src/**/*.test.ts",
     "test:watch": "DEBUG_COLORS=1 DEBUG='scaffold:*' node --test --watch -r @swc-node/register src/**/*.test.ts",
     "lint": "eslint \"{src,test}/**/*.ts\"",
-    "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix"
+    "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
+    "push": "yarn exec ./scripts/publish.sh"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
   ],
-  "bin": "./dist/cli.js",
+  "bin": "dist/cli.js",
   "dependencies": {
     "@types/debug": "^4.1.12",
     "@types/semver": "^7.5.8",
