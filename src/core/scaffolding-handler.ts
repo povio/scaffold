@@ -1,5 +1,3 @@
-import { Project } from 'ts-morph';
-
 import { loadConfig } from './scaffolding-config';
 import { Executor, Module, Request, Task } from './scaffolding.classes';
 import type { IEventHandler, IExecutor, IModule, IRequest, IZod, Observable, IStatus } from './scaffolding.interfaces';
@@ -21,9 +19,6 @@ export class Handler implements Observable {
   // All tasks, made from 1 request and 1 executor
   public readonly tasks: Task[] = [];
 
-  // TsMorph Project of the current codebase
-  public readonly tsMorphProject;
-
   private step:
     | 'initializing'
     | 'loading-configs'
@@ -41,16 +36,34 @@ export class Handler implements Observable {
     public readonly cwd: string = process.cwd(),
     public readonly onEvent: IEventHandler = () => {},
   ) {
-    this.tsMorphProject = new Project({ tsConfigFilePath: `${cwd}/tsconfig.json` });
     this.rawConfig = loadConfig(this.cwd);
     this.status = Status.registered;
   }
 
-  public register<ConfigSchema extends IZod>(module: IModule<ConfigSchema>) {
-    if (!module.name || module.name in this.modulesDict) {
+  public register<ConfigSchema extends IZod>(
+    module:
+      | Module<ConfigSchema>
+      | IModule<ConfigSchema>
+      | { new (...args: Partial<ConstructorParameters<typeof Module<ConfigSchema>>>): Module<ConfigSchema> },
+  ) {
+    if (!module.name) {
       throw new Error(`Can not register module "${module.name ?? '[missing name]'}"`);
     }
-    this.modulesDict[module.name] = new Module(module, this);
+    let override = false;
+    if (module instanceof Module) {
+      if (module.name in this.modulesDict) override = true;
+      this.modulesDict[module.name] = module;
+    } else if (typeof module === 'function' && !!module.prototype && module.prototype.constructor === module) {
+      const m = new module(this);
+      if (m.name in this.modulesDict) override = true;
+      this.modulesDict[m.name] = m;
+    } else {
+      if (module.name in this.modulesDict) override = true;
+      this.modulesDict[module.name] = new Module(this, module);
+    }
+    if (override) {
+      this.modulesDict[module.name].addMessage('info', `Overriding ${module.name}`);
+    }
     return module;
   }
 
@@ -97,11 +110,7 @@ export class Handler implements Observable {
     for (const executor of executors) {
       const task = new Task({}, this, executor, request);
 
-      await task.runInit({
-        withTsMorph: async (func: (context: { project: Project }) => Promise<void>) => {
-          await func({ project: this.tsMorphProject });
-        },
-      });
+      await task.runInit({});
 
       if (task.status === Status.queued) {
         // add to global tasks for execution
@@ -218,15 +227,9 @@ export class Handler implements Observable {
       if (task?.status !== 'queued') {
         throw new Error('Task is not queued');
       }
-      await task.runExec({
-        withTsMorph: async (func: (context: { project: Project }) => Promise<void>) => {
-          await func({ project: this.tsMorphProject });
-        },
-      });
+      await task.runExec({});
     }
 
-    // apply typescript changes
-    await this.tsMorphProject.save();
     this.step = 'executed';
     this.status = Status.executed;
   }

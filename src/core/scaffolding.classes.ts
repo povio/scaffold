@@ -4,9 +4,12 @@ import { Status } from './scaffolding.interfaces';
 
 export class Module<ConfigSchema extends IZod> implements Observable {
   constructor(
-    props: Omit<IModule<ConfigSchema>, 'addRequest'>,
-    private handler: IHandler,
+    protected handler: IHandler,
+    props?: Omit<IModule<ConfigSchema>, 'addRequest'>,
   ) {
+    if (!props) {
+      throw new Error('Module props are required');
+    }
     this.name = props.name;
     this.version = props.version ?? '1.0.0';
     this.description = props.description;
@@ -20,7 +23,6 @@ export class Module<ConfigSchema extends IZod> implements Observable {
     this.requests = [];
     this.executors = [];
     this.exception = props.exception ?? 'ignore';
-
     this.handler.onEvent(Status.registered, this, props);
   }
 
@@ -57,8 +59,8 @@ export class Module<ConfigSchema extends IZod> implements Observable {
     return msg;
   }
 
-  private readonly _requests: IModule<ConfigSchema>['requests'];
-  private readonly _executors: IModule<ConfigSchema>['executors'];
+  protected readonly _requests: IModule<ConfigSchema>['requests'];
+  protected readonly _executors: IModule<ConfigSchema>['executors'];
 
   // Requests made by this module
   requests: Request[];

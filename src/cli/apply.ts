@@ -1,8 +1,10 @@
 /* eslint no-console: 0 */
 
-import { Handler, findScaffoldFiles } from '@povio/scaffold';
 import yargs from 'yargs';
 
+import { TsMorphModule } from '../core/modules/ts-morph.module';
+import { findScaffoldFiles } from '../core/scaffolding-finder';
+import { Handler } from '../core/scaffolding-handler';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
 
 const keypress = async () => {
@@ -54,6 +56,9 @@ export const command: yargs.CommandModule = {
       const yes = args.yes as boolean;
 
       const sh = new Handler(cwd, scaffoldingLogger({ verbose, debug }));
+
+      // build in modules
+      sh.register(TsMorphModule);
 
       for await (const module of findScaffoldFiles({ cwd })) {
         sh.register(module);

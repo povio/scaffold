@@ -1,4 +1,3 @@
-import type { Project } from 'ts-morph';
 import type { z } from 'zod';
 
 import { Handler } from './scaffolding-handler';
@@ -16,7 +15,6 @@ export type IExecutorParams = (
   task: Task,
   actions: {
     addMessage: IMessageAdd;
-    withTsMorph: (func: (context: { project: Project }) => Promise<void>) => Promise<void>;
   },
 ) => Promise<void>;
 
