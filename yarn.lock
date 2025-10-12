@@ -606,14 +606,13 @@ __metadata:
     lodash: "npm:^4.17.21"
     rechoir: "npm:^0.8.0"
     semver: "npm:^7.7.3"
-    supports-color: "npm:^10.2.2"
     ts-morph: "npm:^27.0.0"
     tsup: "npm:^8.5.0"
     typescript: "npm:^5.9.3"
     yaml: "npm:^2.8.1"
     zod: "npm:^4.1.12"
   bin:
-    scaffold: dist/cli.js
+    scaffold: dist/sh.js
   languageName: unknown
   linkType: soft
 
@@ -2556,13 +2555,6 @@ __metadata:
     sucrase: bin/sucrase
     sucrase-node: bin/sucrase-node
   checksum: 10c0/ac85f3359d2c2ecbf5febca6a24ae9bf96c931f05fde533c22a94f59c6a74895e5d5f0e871878dfd59c2697a75ebb04e4b2224ef0bfc24ca1210735c2ec191ef
-  languageName: node
-  linkType: hard
-
-"supports-color@npm:^10.2.2":
-  version: 10.2.2
-  resolution: "supports-color@npm:10.2.2"
-  checksum: 10c0/fb28dd7e0cdf80afb3f2a41df5e068d60c8b4f97f7140de2eaed5b42e075d82a0e980b20a2c0efd2b6d73cfacb55555285d8cc719fa0472220715aefeaa1da7c
   languageName: node
   linkType: hard
 
