@@ -8,7 +8,7 @@ import { IExecutor, IHandler, type IModule } from '../scaffolding.interfaces';
 
 const TsMorphConfig = z.object({
   tsConfigFilePath: z.string().default('tsconfig.json'),
-  lint: z.string().default('yarn eslint --fix $modified'),
+  lint: z.string().default('yarn format'),
 });
 
 export class TsMorphModule extends Module<typeof TsMorphConfig> {

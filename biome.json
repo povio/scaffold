@@ -39,7 +39,7 @@
         "useNamespaceKeyword": "error"
       }
     },
-    "includes": ["**", "**/.eslintrc.js", "**", "**/.eslintrc.js"]
+    "includes": ["**"]
   },
   "javascript": {
     "formatter": {

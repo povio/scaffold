@@ -59,7 +59,6 @@ export async function* findScaffoldFiles<SM extends IModule<any>>(context: { cwd
       yield await loadModule(`${context.cwd}/${file}`);
     } catch (error) {
       // todo messages
-      // eslint-disable-next-line no-console
       console.error(error);
     }
   }

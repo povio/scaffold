@@ -1,5 +1,3 @@
-/* eslint no-console: 0 */
-
 import { blue, cyan, dim, italic, magenta, red } from 'colorette';
 import { padEnd, padStart } from 'lodash';
 

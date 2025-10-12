@@ -99,7 +99,6 @@ export type IEventHandler = (
   data?: any,
 ) => void;
 
-// eslint-disable-next-line @typescript-eslint/no-empty-interface,@typescript-eslint/no-empty-object-type
 export interface IHandler extends Handler {}
 
 export abstract class Observable {
