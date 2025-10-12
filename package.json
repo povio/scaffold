@@ -1,6 +1,6 @@
 {
   "name": "@povio/scaffold",
-  "version": "1.3.4",
+  "version": "1.4.0",
   "author": "Marko Zabreznik <marko.zabreznik@povio.com> (https://zabreznik.net)",
   "description": "Scaffolding tool for TypeScript projects",
   "license": "BSD-3-Clause",
@@ -13,12 +13,58 @@
     "lint:check": "biome check",
     "push": "yarn exec ./scripts/publish.sh"
   },
+  "files": ["dist", "README.md"],
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js"
+    },
+    "./plugins/colorette": {
+      "types": "./dist/plugins/colorette.d.ts",
+      "import": "./dist/plugins/colorette.js"
+    },
+    "./plugins/debug": {
+      "types": "./dist/plugins/debug.d.ts",
+      "import": "./dist/plugins/debug.js"
+    },
+    "./plugins/fast-glob": {
+      "types": "./dist/plugins/fast-glob.d.ts",
+      "import": "./dist/plugins/fast-glob.js"
+    },
+    "./plugins/lodash": {
+      "types": "./dist/plugins/lodash.d.ts",
+      "import": "./dist/plugins/lodash.js"
+    },
+    "./plugins/semver": {
+      "types": "./dist/plugins/semver.d.ts",
+      "import": "./dist/plugins/semver.js"
+    },
+    "./plugins/ts-morph": {
+      "types": "./dist/plugins/ts-morph.d.ts",
+      "import": "./dist/plugins/ts-morph.js"
+    },
+    "./plugins/yaml": {
+      "types": "./dist/plugins/yaml.d.ts",
+      "import": "./dist/plugins/yaml.js"
+    },
+    "./plugins/zod": {
+      "types": "./dist/plugins/zod.d.ts",
+      "import": "./dist/plugins/zod.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "plugins/colorette": ["dist/plugins/colorette.d.ts"],
+      "plugins/debug": ["dist/plugins/debug.d.ts"],
+      "plugins/fast-glob": ["dist/plugins/fast-glob.d.ts"],
+      "plugins/lodash": ["dist/plugins/lodash.d.ts"],
+      "plugins/semver": ["dist/plugins/semver.d.ts"],
+      "plugins/ts-morph": ["dist/plugins/ts-morph.d.ts"],
+      "plugins/yaml": ["dist/plugins/yaml.d.ts"],
+      "plugins/zod": ["dist/plugins/zod.d.ts"]
+    }
+  },
   "bin": "dist/sh.js",
   "dependencies": {
     "colorette": "^2.0.20",

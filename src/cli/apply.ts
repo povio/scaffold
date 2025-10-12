@@ -1,3 +1,5 @@
+import '../core/helpers/module-require';
+
 import { z } from 'zod';
 import { getArgs } from '../core/helpers/args';
 import { keypress } from '../core/helpers/keypress';
