@@ -5,7 +5,7 @@ import type { Executor, Module, Request, Task } from './scaffolding.classes';
 
 type Optional<T, K extends keyof T> = Partial<Pick<T, K>> & Omit<T, K>;
 
-export type IZod = z.ZodObject<any, any, any>;
+export type IZod = z.ZodObject<any, any>;
 
 export type IRequest = Partial<Omit<Request, 'tasks' | 'status' | 'id'>> & { match: string };
 
@@ -100,6 +100,7 @@ export type IEventHandler = (
   data?: any,
 ) => void;
 
+// eslint-disable-next-line @typescript-eslint/no-empty-interface,@typescript-eslint/no-empty-object-type
 export interface IHandler extends Handler {}
 
 export abstract class Observable {
