@@ -587,32 +587,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@povio/resolve-config@npm:^1.0.9":
-  version: 1.0.9
-  resolution: "@povio/resolve-config@npm:1.0.9"
-  peerDependencies:
-    "@aws-sdk/client-ssm": ^3.840.0
-    "@aws-sdk/client-sts": ^3.840.0
-    "@aws-sdk/credential-providers": ^3.840.0
-  peerDependenciesMeta:
-    "@aws-sdk/client-ssm":
-      optional: true
-    "@aws-sdk/client-sts":
-      optional: true
-    "@aws-sdk/credential-providers":
-      optional: true
-  bin:
-    resolve-config: dist/sh.js
-  checksum: 10c0/058cc4d327b43e5e17ca0a4d775a7a60472e3aab3eb104ac515f8eb5c520ab0b006f3a8e6814d8aa94c887812c14d1982e1b05fd70d202e3c708282b96752dac
-  languageName: node
-  linkType: hard
-
 "@povio/scaffold@workspace:.":
   version: 0.0.0-use.local
   resolution: "@povio/scaffold@workspace:."
   dependencies:
     "@biomejs/biome": "npm:^2.2.5"
-    "@povio/resolve-config": "npm:^1.0.9"
     "@swc-node/register": "npm:^1.11.1"
     "@swc/core": "npm:1.13.20"
     "@types/debug": "npm:^4.1.12"
@@ -1451,11 +1430,11 @@ __metadata:
   linkType: hard
 
 "fastq@npm:^1.6.0":
-  version: 1.17.1
-  resolution: "fastq@npm:1.17.1"
+  version: 1.19.1
+  resolution: "fastq@npm:1.19.1"
   dependencies:
     reusify: "npm:^1.0.4"
-  checksum: 10c0/1095f16cea45fb3beff558bb3afa74ca7a9250f5a670b65db7ed585f92b4b48381445cd328b3d87323da81e43232b5d5978a8201bde84e0cd514310f1ea6da34
+  checksum: 10c0/ebc6e50ac7048daaeb8e64522a1ea7a26e92b3cee5cd1c7f2316cdca81ba543aa40a136b53891446ea5c3a67ec215fbaca87ad405f102dd97012f62916905630
   languageName: node
   linkType: hard
 
@@ -2306,9 +2285,9 @@ __metadata:
   linkType: hard
 
 "reusify@npm:^1.0.4":
-  version: 1.0.4
-  resolution: "reusify@npm:1.0.4"
-  checksum: 10c0/c19ef26e4e188f408922c46f7ff480d38e8dfc55d448310dfb518736b23ed2c4f547fb64a6ed5bdba92cd7e7ddc889d36ff78f794816d5e71498d645ef476107
+  version: 1.1.0
+  resolution: "reusify@npm:1.1.0"
+  checksum: 10c0/4eff0d4a5f9383566c7d7ec437b671cc51b25963bd61bf127c3f3d3f68e44a026d99b8d2f1ad344afff8d278a8fe70a8ea092650a716d22287e8bef7126bb2fa
   languageName: node
   linkType: hard
 

@@ -7,7 +7,7 @@ import { Handler } from '../core/scaffolding-handler';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
 
 const schema = z.object({
-  cwd: z.nullable(z.optional(z.string())),
+  cwd: z.nullable(z.optional(z.string())).default(process.cwd()),
   verbose: z.nullable(z.optional(z.boolean())),
   debug: z.nullable(z.optional(z.boolean())),
   yes: z.nullable(z.optional(z.boolean())),
