@@ -10,7 +10,7 @@ NAME:
   scaffold - Scaffolding tools for Typescript projects
 
 USAGE:
-  Resolve configuration files using templates and (remote) variables.
+  Scaffold using configuration files found in the project itself
 
   Documentation is available at https://github.com/povio/scaffold
 
