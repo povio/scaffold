@@ -7,7 +7,7 @@ export class Handler implements Observable {
   // All modules
   public readonly modulesDict: Record<string, Module<any>> = {};
 
-  // Raw cosmiconfig
+  // Raw config
   public readonly rawConfig: Record<string, any> = {};
 
   // All executors

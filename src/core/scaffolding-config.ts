@@ -1,32 +1,34 @@
-import { cosmiconfigSync } from 'cosmiconfig';
+import { existsSync, readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { debug as _debug } from 'debug';
+import { parse } from 'yaml';
 
 const debug = _debug('scaffold:config');
 
 export function loadConfig(cwd: string): Record<string, any> {
-  const explorer = cosmiconfigSync('scaffold', {
-    stopDir: cwd,
-    searchPlaces: [
-      `.scaffold/scaffold.config.json`,
-      `.scaffold/scaffold.config.yaml`,
-      `.scaffold/scaffold.config.yml`,
-      `.scaffold/scaffold.config.js`,
-      `.scaffold/scaffold.config.ts`,
-      `.scaffold/scaffold.config.cjs`,
-      `scaffold.config.json`,
-      `scaffold.config.yaml`,
-      `scaffold.config.yml`,
-      `scaffold.config.js`,
-      `scaffold.config.ts`,
-      `scaffold.config.cjs`,
-    ],
-    mergeSearchPlaces: false,
-  });
-  const result = explorer.search(cwd);
-  if (!result || result.isEmpty) {
-    debug(`no config found`);
-    return {};
+  const configPaths = [
+    `.scaffold/scaffold.config.yaml`,
+    `.scaffold/scaffold.config.yml`,
+    `.scaffold/scaffold.config.json`,
+    `scaffold.config.yaml`,
+    `scaffold.config.yml`,
+    `scaffold.config.json`,
+  ];
+
+  for (const cP of configPaths) {
+    const cPath = join(cwd, cP);
+    if (existsSync(cPath)) {
+      debug(`using ${cPath}`);
+      const cContent = readFileSync(cPath, 'utf-8');
+      if (cP.endsWith('.json')) {
+        return JSON.parse(cContent);
+      }
+      if (cP.endsWith('.yml') || cP.endsWith('.yaml')) {
+        return parse(cContent);
+      }
+    }
   }
-  debug(`using ${result.filepath}`);
-  return result.config;
+
+  debug(`no config found`);
+  return {};
 }
