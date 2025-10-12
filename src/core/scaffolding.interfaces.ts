@@ -1,7 +1,6 @@
 import type { z } from 'zod';
-
-import { Handler } from './scaffolding-handler';
 import type { Executor, Module, Request, Task } from './scaffolding.classes';
+import { Handler } from './scaffolding-handler';
 
 type Optional<T, K extends keyof T> = Partial<Pick<T, K>> & Omit<T, K>;
 

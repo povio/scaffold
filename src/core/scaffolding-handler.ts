@@ -1,7 +1,7 @@
-import { loadConfig } from './scaffolding-config';
 import { Executor, Module, Request, Task } from './scaffolding.classes';
-import type { IEventHandler, IExecutor, IModule, IRequest, IZod, Observable, IStatus } from './scaffolding.interfaces';
+import type { IEventHandler, IExecutor, IModule, IRequest, IStatus, IZod, Observable } from './scaffolding.interfaces';
 import { Status } from './scaffolding.interfaces';
+import { loadConfig } from './scaffolding-config';
 
 export class Handler implements Observable {
   // All modules

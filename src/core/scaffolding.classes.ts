@@ -1,6 +1,5 @@
 import type { IExecutor, IMessage, IModule, IModuleInit, IStatus } from './scaffolding.interfaces';
-import { IExecutorParams, IHandler, IRequest, ITask, IZod, Observable } from './scaffolding.interfaces';
-import { Status } from './scaffolding.interfaces';
+import { IExecutorParams, IHandler, IRequest, ITask, IZod, Observable, Status } from './scaffolding.interfaces';
 
 export class Module<ConfigSchema extends IZod> implements Observable {
   constructor(

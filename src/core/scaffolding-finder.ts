@@ -1,7 +1,7 @@
-import { glob } from 'fast-glob';
-import { jsVariants } from 'interpret';
 import { extname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { glob } from 'fast-glob';
+import { jsVariants } from 'interpret';
 import { prepare } from 'rechoir';
 
 import type { IModule } from './scaffolding.interfaces';
@@ -14,12 +14,13 @@ import type { IModule } from './scaffolding.interfaces';
 async function tryRequireThenImport(module: string): Promise<any> {
   let result;
   try {
+    // biome-ignore lint/style/noCommonJs: support both require and import
     result = require(module);
   } catch (error: any) {
     let importEsm: ((module: string) => Promise<{ default: any }>) | undefined;
     try {
       importEsm = new Function('id', 'return import(id);') as any;
-    } catch (e) {
+    } catch (_e) {
       importEsm = undefined;
     }
     if (error.code === 'ERR_REQUIRE_ESM' && importEsm) {

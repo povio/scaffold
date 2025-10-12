@@ -8,16 +8,13 @@
     "cli": "DEBUG_COLORS=1 DEBUG='scaffold:*' node -r @swc-node/register src/cli.ts",
     "test": "DEBUG_COLORS=1 DEBUG='scaffold:*' node --test -r @swc-node/register src/**/*.test.ts",
     "test:watch": "DEBUG_COLORS=1 DEBUG='scaffold:*' node --test --watch -r @swc-node/register src/**/*.test.ts",
-    "lint": "eslint \"{src,test}/**/*.ts\"",
-    "lint:fix": "eslint \"{src,test}/**/*.ts\" --fix",
+    "lint": "biome check  --write .",
+    "lint:check": "biome check",
     "push": "yarn exec ./scripts/publish.sh"
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md"
-  ],
+  "files": ["dist", "README.md"],
   "bin": "dist/cli.js",
   "dependencies": {
     "@types/debug": "^4.1.12",
@@ -38,18 +35,12 @@
     "zod": "^4.1.12"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.2.5",
     "@swc-node/register": "^1.11.1",
     "@swc/core": "1.13.20",
     "@types/interpret": "^1.1.3",
     "@types/lodash": "^4.17.20",
     "@types/rechoir": "^0.6.4",
-    "@typescript-eslint/eslint-plugin": "^8.46.0",
-    "@typescript-eslint/parser": "^8.46.0",
-    "eslint": "^9.37.0",
-    "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-import-helpers": "^2.0.1",
-    "eslint-plugin-prettier": "^5.5.4",
-    "prettier": "^3.6.2",
     "tsup": "^8.5.0",
     "typescript": "^5.9.3"
   },

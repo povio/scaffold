@@ -1,9 +1,8 @@
 import { test } from 'node:test';
-import { parseDocument, type Document } from 'yaml';
-
+import { type Document, parseDocument } from 'yaml';
+import { IModule, Status } from '../core/scaffolding.interfaces';
 import { Handler } from '../core/scaffolding-handler';
 import { scaffoldingLogger } from '../core/scaffolding-logger';
-import { IModule, Status } from '../core/scaffolding.interfaces';
 
 test('yarn scaffold', async () => {
   const files: Record<
