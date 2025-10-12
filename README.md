@@ -9,7 +9,6 @@ relying on the modules to provide the necessary information.
 ## Dependencies
 
 - `ts-morph` for TypeScript AST manipulation
-- `yargs` for CLI parsing
 - `zod` for schema validation
 - `yaml` for configuration
 - `cosmiconfig` for configuration loading
